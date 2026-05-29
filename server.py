@@ -119,6 +119,9 @@ def chat():
         print(f"❌ Error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/')
+def home():
+    return "¡CORELLA SATEC está viva! 🎉. El servidor funciona correctamente."
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({
@@ -132,10 +135,6 @@ def health():
 # INICIO
 # ============================================================
 
+# Al final del archivo, asegúrate de tener este bloque
 if __name__ == '__main__':
-    print("=" * 60)
-    print("🛰️ CORELLA SATEC - Asistente IA")
-    print("=" * 60)
-    print(f"🌐 Puerto: {PORT}")
-    print("=" * 60)
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)), debug=False)
