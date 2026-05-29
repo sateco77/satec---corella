@@ -122,6 +122,7 @@ def chat():
 @app.route('/')
 def home():
     return "¡CORELLA SATEC está viva! 🎉. El servidor funciona correctamente."
+
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({
