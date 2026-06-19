@@ -68,7 +68,7 @@ def generar_respuesta(user_message):
     prompt_lower = user_message.lower()
     
     if "gps" in prompt_lower or "rastreo" in prompt_lower or "flota" in prompt_lower:
-        return "🚗 ¡Ahí te va, tío! **SATEC GPS Tracker** ofrece el plan **Básico Taxi por $100/mes**. Incluye rastreo en tiempo real, App PWA y historial 24h. ¿Necesitas más detalles, máquina?"
+        return "🚗 ¡Ahí te va, Inge! **SATEC GPS Tracker** ofrece el plan **Básico Taxi por $100/mes**. Incluye rastreo en tiempo real, App PWA y historial 24h. ¿Necesitas más detalles, máquina?"
     
     elif "full logistics" in prompt_lower:
         return "🚛 ¡Órale! **Full Logistics** cuesta $300/mes ($100 el primer mes). Incluye: corte de motor remoto, geocerca anti-robo, botón pánico y sensor de velocidad. Ideal para flotas en el Tren Maya, tío."
@@ -83,10 +83,10 @@ def generar_respuesta(user_message):
         return "🔐 **SATEC Access Control** ofrece biometría avanzada (huella, facial, iris) y QR dinámico. Precisión del 98.7% con latencia <0.5s. ¿Te interesa una demo, tío?"
     
     elif "precio" in prompt_lower or "costo" in prompt_lower or "plan" in prompt_lower:
-        return "💰 ¡Qué padre que preguntas, máquina! Nuestros planes:\n• Básico Taxi: $100/mes\n• Full Logistics: $300/mes ($100 primer mes)\n• Fleet Pro: $250/unidad\n• CCTV Residencial: $350/mes\n• CCTV Empresarial: $890/mes\n¿Cuál te interesa, tío?"
+        return "💰 ¡Qué padre que preguntas, Inge! Nuestros planes:\n• Básico Taxi: $100/mes\n• Full Logistics: $300/mes ($100 primer mes)\n• Fleet Pro: $250/unidad\n• CCTV Residencial: $350/mes\n• CCTV Empresarial: $890/mes\n¿Cuál te interesa, tío?"
     
     else:
-        return f"📡 ¡Qué padre que preguntas, tío! Para más información sobre **SATEC NETWORK** (GPS Tracker, CHIP TAXI, CCTV o Access Control), llamanos al **+52 938 120 6643**.\n\n¿Necesitas algo específico, máquina?"
+        return f"📡 ¡Qué padre que preguntas, Ingeniero! Para más información sobre **SATEC NETWORK** (GPS Tracker, CHIP TAXI, CCTV o Access Control), llamanos al **+52 938 120 6643**.\n\n¿Necesitas algo específico, máquina?"
 
 # ============================================================
 # RUTAS DE LA API
