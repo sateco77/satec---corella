@@ -104,7 +104,8 @@ def static_files(path):
 def chat():
     try:
         data = request.json
-        # ✅ CORREGIDO: Acepta 'mensaje' (desde el widget) o 'message'
+        print(f"📨 Recibido: {data}")  # <-- AÑADE ESTA LÍNEA
+        
         user_message = data.get('mensaje') or data.get('message', '')
         
         if not user_message:
