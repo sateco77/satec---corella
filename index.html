@@ -30,10 +30,110 @@
             </div>
         </div>
         <div class="chat-input-area">
-            <input type="text" id="messageInput" placeholder="Escribe tu consulta técnica aquí...">
+            <input type="text" id="messageInput" placeholder="Escribe tu consulta técnica aquí..." autocomplete="off">
             <button id="sendBtn">Enviar</button>
         </div>
     </div>
-    <script src="script.js"></script>
+
+    <script>
+        const API_URL = 'https://satec-corella.onrender.com/api/chat';
+        let isWaitingResponse = false;
+
+        const chatMessages = document.getElementById('messages');
+        const chatInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        // Función para pintar mensajes en pantalla
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = isUser ? 'message user' : 'message bot';
+            // Nota: Usamos innerHTML por si tu servidor de Python devuelve negritas (**) o saltos de línea
+            messageDiv.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Indicador de que Corella está procesando
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot typing';
+            typingDiv.id = 'typing-indicator';
+            typingDiv.innerHTML = '⚡ CORELLA está procesando tu consulta...';
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        // Función principal de envío
+        async function enviarConsulta() {
+            if (isWaitingResponse) return;
+
+            const text = chatInput.value.trim();
+            if (text === "") return;
+
+            isWaitingResponse = true;
+            addMessage(text, true); // Pinta el mensaje del usuario
+            chatInput.value = '';   // Limpia la caja de texto
+            showTypingIndicator();
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mensaje: text }) // Enviamos 'mensaje' como lo espera tu Python
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    removeTypingIndicator();
+                    addMessage(`❌ Error del servidor: ${data.error || 'Error desconocido'}`, false);
+                    return;
+                }
+
+                // Extrae la respuesta de las llaves que programaste en tu server.py
+                const reply = data.respuesta || data.response || "Lo siento, sobrino, no pude procesar la solicitud.";
+                removeTypingIndicator();
+                addMessage(reply, false);
+
+            } catch (error) {
+                removeTypingIndicator();
+                addMessage("⚠️ Error de conexión. El servidor en Render podría estar despertando, intenta de nuevo en unos segundos.", false);
+                console.error("Error crítico:", error);
+            } finally {
+                isWaitingResponse = false;
+            }
+        }
+
+        // Escuchadores de eventos asignados a tus botones reales
+        if (sendBtn) {
+            sendBtn.onclick = function() {
+                enviarConsulta();
+            };
+        }
+
+        if (chatInput) {
+            chatInput.onkeypress = function(e) {
+                if (e.key === 'Enter') {
+                    enviarConsulta();
+                }
+            };
+        }
+
+        // Mantenemos vivo el server de Render pegándole a la ruta de salud de tu server.py
+        function keepAlive() {
+            fetch('https://satec-corella.onrender.com/api/health', { method: 'GET' })
+            .then(res => res.json())
+            .then(data => console.log("Corella en línea, jefe:", data.status))
+            .catch(e => console.log("Keep-alive en espera...", e));
+        }
+        
+        keepAlive();
+        setInterval(keepAlive, 5 * 60 * 1000); // Cada 5 minutos
+    </script>
 </body>
 </html>
