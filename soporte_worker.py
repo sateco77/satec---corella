@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-CORELLA EMAIL WORKER - Procesa correos y asigna tareas a agentes IA
-Las credenciales se cargan desde variables de entorno (Render)
+SOPORTE WORKER - Procesa correos de soporte para ORION (IA)
+Lee correos desde contacto@satecnetwork.com y crea tareas para ORION
+Credenciales desde variables de entorno (Render)
 """
 
 import os
@@ -22,18 +23,21 @@ from datetime import datetime
 # CONFIGURACIÓN DESDE VARIABLES DE ENTORNO
 # ============================================================
 
-# Base de datos (desde variables de entorno)
+# Base de datos
 DB_HOST = os.environ.get('DB_HOST')
 DB_USER = os.environ.get('DB_USER')
 DB_PASSWORD = os.environ.get('DB_PASSWORD')
 DB_NAME = os.environ.get('DB_NAME', 'u416165369_corella_crm')
 
-# Email (desde variables de entorno)
-EMAIL_USER = os.environ.get('EMAIL_USER')
+# Email de soporte
+EMAIL_USER = os.environ.get('EMAIL_USER', 'contacto@satecnetwork.com')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 IMAP_SERVER = os.environ.get('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.hostinger.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', 465))
+
+# ID del agente ORION (Soporte)
+AGENTE_ORION_ID = int(os.environ.get('AGENTE_ORION_ID', 55))
 
 # Intervalo de revisión (minutos)
 INTERVALO_MINUTOS = int(os.environ.get('INTERVALO_MINUTOS', 5))
@@ -42,9 +46,9 @@ INTERVALO_MINUTOS = int(os.environ.get('INTERVALO_MINUTOS', 5))
 # VALIDACIÓN DE CONFIGURACIÓN
 # ============================================================
 
-if not all([DB_HOST, DB_USER, DB_PASSWORD, EMAIL_USER, EMAIL_PASSWORD]):
-    print("❌ ERROR: Faltan variables de entorno. Asegúrate de configurar:")
-    print("   DB_HOST, DB_USER, DB_PASSWORD, EMAIL_USER, EMAIL_PASSWORD")
+if not all([DB_HOST, DB_USER, DB_PASSWORD, EMAIL_PASSWORD]):
+    print("❌ ERROR: Faltan variables de entorno. Configura:")
+    print("   DB_HOST, DB_USER, DB_PASSWORD, EMAIL_PASSWORD")
     exit(1)
 
 # ============================================================
@@ -63,7 +67,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 def get_db_connection():
-    """Retorna conexión a la base de datos usando variables de entorno"""
+    """Retorna conexión a la base de datos"""
     return mysql.connector.connect(
         host=DB_HOST,
         user=DB_USER,
@@ -72,77 +76,63 @@ def get_db_connection():
     )
 
 # ============================================================
-# OBTENER AGENTES CON EMAIL CONFIGURADO
+# CONEXIÓN IMAP
 # ============================================================
 
-def get_agentes_email():
-    """Obtiene agentes con configuración de email activa"""
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("""
-        SELECT 
-            u.id,
-            u.nombre,
-            ac.credenciales,
-            ac.canal,
-            u.especialidades
-        FROM agentes_config ac
-        JOIN usuarios u ON ac.agente_id = u.id
-        WHERE ac.canal IN ('email', 'email_soporte') 
-        AND ac.activo = 1
-    """)
-    agentes = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return agentes
-
-# ============================================================
-# FUNCIONES PRINCIPALES
-# ============================================================
-
-def detectar_especialidad(texto):
-    """Detecta la especialidad basada en palabras clave"""
-    texto_lower = texto.lower()
-    
-    keywords = {
-        'gps': ['gps', 'rastreo', 'flota', 'geocerca', 'vehículo', 'tracking'],
-        'cctv': ['cámara', 'video', 'vigilancia', 'cctv', 'movimiento'],
-        'access': ['acceso', 'biometría', 'huella', 'qr', 'lector'],
-        'chip_taxi': ['taxi', 'viaje', 'chip taxi', 'conductor']
-    }
-    
-    for especialidad, palabras in keywords.items():
-        for palabra in palabras:
-            if palabra in texto_lower:
-                return especialidad
-    return None
-
-def conectar_imap(credenciales):
-    """Conecta al servidor IMAP usando credenciales del agente"""
+def conectar_imap():
+    """Conecta al servidor IMAP de soporte"""
     try:
-        email_user = credenciales.get('email') or EMAIL_USER
-        email_pass = credenciales.get('password') or EMAIL_PASSWORD
-        imap_server = credenciales.get('imap_server', IMAP_SERVER)
-        
         context = ssl.create_default_context()
-        mail = imaplib.IMAP4_SSL(imap_server, 993, ssl_context=context)
-        mail.login(email_user, email_pass)
+        mail = imaplib.IMAP4_SSL(IMAP_SERVER, 993, ssl_context=context)
+        mail.login(EMAIL_USER, EMAIL_PASSWORD)
         mail.select('INBOX')
+        logger.info(f"✅ Conectado a IMAP: {EMAIL_USER}")
         return mail
     except Exception as e:
         logger.error(f"❌ Error conectando IMAP: {e}")
         return None
 
-def procesar_correos(agente_id, nombre, credenciales):
-    """Procesa correos no leídos para un agente"""
-    mail = conectar_imap(credenciales)
+# ============================================================
+# DETECTAR PALABRAS CLAVE DE SOPORTE
+# ============================================================
+
+def es_caso_soporte(texto):
+    """Detecta si el correo es un caso de soporte técnico"""
+    texto_lower = texto.lower()
+    
+    keywords_soporte = [
+        'falla', 'error', 'problema', 'no funciona', 'avería', 'bug',
+        'no enciende', 'pantalla', 'conexión', 'red', 'instalación',
+        'configuración', 'cámara', 'gps', 'tracker', 'chip taxi', 'acceso',
+        'biometría', 'huella', 'lector', 'alarma', 'sensor'
+    ]
+    
+    for keyword in keywords_soporte:
+        if keyword in texto_lower:
+            return True
+    return False
+
+# ============================================================
+# PROCESAR CORREOS
+# ============================================================
+
+def procesar_correos_soporte():
+    """Procesa correos no leídos y crea tareas para ORION"""
+    mail = conectar_imap()
     if not mail:
         return
     
     try:
         result, data = mail.search(None, 'UNSEEN')
         email_ids = data[0].split()
-        logger.info(f"📧 {len(email_ids)} correos nuevos para {nombre}")
+        
+        if not email_ids:
+            logger.info("📭 No hay correos nuevos")
+            mail.close()
+            mail.logout()
+            return
+        
+        logger.info(f"📧 {len(email_ids)} correos nuevos de soporte")
         
         for email_id in email_ids:
             try:
@@ -162,24 +152,33 @@ def procesar_correos(agente_id, nombre, credenciales):
                 else:
                     cuerpo = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
                 
-                logger.info(f"📧 De: {remitente} | Asunto: {asunto[:50]}")
+                texto_completo = f"{asunto} {cuerpo}"
                 
-                # Crear tarea en la base de datos
+                # Verificar si es caso de soporte
+                if not es_caso_soporte(texto_completo):
+                    logger.info(f"⏭️  No es caso de soporte: {asunto[:30]}...")
+                    mail.store(email_id, '+FLAGS', '\\Seen')
+                    continue
+                
+                # Crear tarea para ORION
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO tareas (texto, fecha_limite, asignada_por, asignada_a, fuente)
-                    VALUES (%s, DATE_ADD(CURDATE(), INTERVAL 1 DAY), %s, %s, 'correo')
+                    VALUES (%s, DATE_ADD(CURDATE(), INTERVAL 1 DAY), %s, %s, 'correo_soporte')
                 """, (
-                    f"Correo de {remitente}: {asunto[:50]}...",
-                    1, agente_id
+                    f"🔧 SOPORTE: {remitente} - {asunto[:80]}...",
+                    1,  # asignada_por (gerente)
+                    AGENTE_ORION_ID
                 ))
                 conn.commit()
                 tarea_id = cursor.lastrowid
                 cursor.close()
                 conn.close()
                 
-                logger.info(f"📋 Tarea creada (ID: {tarea_id}) para {nombre}")
+                logger.info(f"📋 Tarea de soporte creada (ID: {tarea_id}) para ORION")
+                
+                # Marcar como leído
                 mail.store(email_id, '+FLAGS', '\\Seen')
                 
             except Exception as e:
@@ -192,61 +191,80 @@ def procesar_correos(agente_id, nombre, credenciales):
     except Exception as e:
         logger.error(f"❌ Error procesando correos: {e}")
 
-def actualizar_estado(agente_id, estado):
-    """Actualiza el estado del agente en la DB"""
+# ============================================================
+# ACTUALIZAR ESTADO DE ORION
+# ============================================================
+
+def actualizar_estado_orion(estado):
+    """Actualiza el estado de ORION en la DB"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE agentes_config 
             SET estado = %s, ultima_conexion = NOW() 
-            WHERE agente_id = %s
-        """, (estado, agente_id))
+            WHERE agente_id = %s AND canal = 'email_soporte'
+        """, (estado, AGENTE_ORION_ID))
         conn.commit()
         cursor.close()
         conn.close()
+        logger.info(f"📊 Estado de ORION actualizado: {estado}")
     except Exception as e:
         logger.error(f"❌ Error actualizando estado: {e}")
+
+# ============================================================
+# ENVIAR RESPUESTA (Opcional)
+# ============================================================
+
+def enviar_respuesta(para, asunto_original, respuesta):
+    """Envía respuesta por correo (cuando ORION genera una respuesta)"""
+    try:
+        msg = MIMEText(respuesta, 'plain', 'utf-8')
+        msg['Subject'] = f"Re: {asunto_original}"
+        msg['From'] = EMAIL_USER
+        msg['To'] = para
+        
+        context = ssl.create_default_context()
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context)
+        server.login(EMAIL_USER, EMAIL_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        logger.info(f"✅ Respuesta enviada a {para}")
+    except Exception as e:
+        logger.error(f"❌ Error enviando respuesta: {e}")
 
 # ============================================================
 # BUCLE PRINCIPAL
 # ============================================================
 
 def main():
-    logger.info("=" * 60)
-    logger.info("🚀 CORELLA EMAIL WORKER")
-    logger.info("=" * 60)
-    logger.info(f"📧 Email: {EMAIL_USER}")
-    logger.info(f"📡 IMAP: {IMAP_SERVER}")
-    logger.info(f"⏱️  Intervalo: {INTERVALO_MINUTOS} minutos")
-    logger.info("=" * 60)
+    print("=" * 60)
+    print("🔧 SOPORTE WORKER - ORION (IA)")
+    print("=" * 60)
+    print(f"📧 Email: {EMAIL_USER}")
+    print(f"📡 IMAP: {IMAP_SERVER}")
+    print(f"🤖 Agente: ORION (ID: {AGENTE_ORION_ID})")
+    print(f"⏱️  Intervalo: {INTERVALO_MINUTOS} minutos")
+    print("=" * 60)
+    
+    # Actualizar estado inicial
+    actualizar_estado_orion('online')
     
     while True:
         try:
-            agentes = get_agentes_email()
-            logger.info(f"📋 {len(agentes)} agentes con email configurado")
-            
-            for agente in agentes:
-                try:
-                    agente_id = agente['id']
-                    nombre = agente['nombre']
-                    credenciales = json.loads(agente['credenciales'])
-                    
-                    actualizar_estado(agente_id, 'online')
-                    procesar_correos(agente_id, nombre, credenciales)
-                    
-                except Exception as e:
-                    logger.error(f"❌ Error procesando agente: {e}")
-                    actualizar_estado(agente_id, 'error')
+            logger.info("🔄 Ciclo de revisión iniciado")
+            procesar_correos_soporte()
             
             logger.info(f"⏱️  Esperando {INTERVALO_MINUTOS} minutos...")
             time.sleep(INTERVALO_MINUTOS * 60)
             
         except KeyboardInterrupt:
             logger.info("🛑 Worker detenido")
+            actualizar_estado_orion('offline')
             break
         except Exception as e:
-            logger.error(f"❌ Error: {e}")
+            logger.error(f"❌ Error en ciclo principal: {e}")
+            actualizar_estado_orion('error')
             time.sleep(60)
 
 if __name__ == '__main__':
