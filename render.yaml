@@ -1,4 +1,7 @@
 services:
+  # ============================================================
+  # SERVICIO 1: CORELLA API (Web)
+  # ============================================================
   - type: web
     name: corella-satec
     env: python
@@ -7,3 +10,43 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: PORT
+        value: 10000
+
+  # ============================================================
+  # SERVICIO 2: SOPORTE WORKER (ORION - IA)
+  # ============================================================
+  - type: worker
+    name: soporte-worker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python soporte_worker.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      # Base de datos (Hostinger)
+      - key: DB_HOST
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: u416165369_corella_crm
+      # Email de soporte
+      - key: EMAIL_USER
+        value: contacto@satecnetwork.com
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: IMAP_SERVER
+        value: imap.hostinger.com
+      - key: SMTP_SERVER
+        value: smtp.hostinger.com
+      - key: SMTP_PORT
+        value: 465
+      # ID del agente ORION
+      - key: AGENTE_ORION_ID
+        value: 55
+      # Intervalo de revisión (minutos)
+      - key: INTERVALO_MINUTOS
+        value: 5
