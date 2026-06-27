@@ -134,34 +134,95 @@ def get_agente_por_especialidad(especialidad):
 # FUNCIONES DE CORREO
 # ============================================================
 
-def conectar_imap():
+def conectar_imap(email_user, email_password):
     try:
         context = ssl.create_default_context()
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, 993, ssl_context=context)
-        mail.login(EMAIL_USER, EMAIL_PASSWORD)
+        mail.login(email_user, email_password)
         mail.select('INBOX')
         return mail
     except Exception as e:
-        print(f"❌ Error IMAP: {e}")
+        print(f"❌ Error IMAP para {email_user}: {e}")
         return None
 
-def enviar_correo(para, asunto, mensaje):
-    try:
-        msg = MIMEText(mensaje, 'plain', 'utf-8')
-        msg['Subject'] = asunto
-        msg['From'] = EMAIL_USER
-        msg['To'] = para
-        
-        context = ssl.create_default_context()
-        server = smtplib.SMTP_SSL(SMTP_SERVER, 465, context=context)
-        server.login(EMAIL_USER, EMAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        return True
-    except Exception as e:
-        print(f"❌ Error SMTP: {e}")
-        return False
+def procesar_correos():
+    resultados = []
+    
+    # Procesar correos de ORION (Soporte)
+    resultados.append(procesar_una_cuenta(EMAIL_USER, EMAIL_PASSWORD, "Orion"))
+    
+    # Procesar correos de LUCÍA (Ventas)
+    resultados.append(procesar_una_cuenta(EMAIL_VENTAS, EMAIL_VENTAS_PASSWORD, "Lucía"))
+    
+    return {
+        'success': True,
+        'message': f"Procesados: {len(resultados)} cuentas",
+        'resultados': resultados
+    }
 
+def procesar_una_cuenta(email_user, email_password, nombre_agente):
+    mail = conectar_imap(email_user, email_password)
+    if not mail:
+        return {'cuenta': email_user, 'status': 'error', 'message': 'No se pudo conectar'}
+    
+    try:
+        result, data = mail.search(None, 'UNSEEN')
+        email_ids = data[0].split()
+        
+        if not email_ids:
+            mail.close()
+            mail.logout()
+            return {'cuenta': email_user, 'status': 'ok', 'procesados': 0}
+        
+        procesados = 0
+        for email_id in email_ids:
+            try:
+                result, msg_data = mail.fetch(email_id, '(RFC822)')
+                msg = email.message_from_bytes(msg_data[0][1])
+                
+                remitente = msg.get('From', 'Desconocido')
+                asunto = msg.get('Subject', 'Sin asunto')
+                cuerpo = ""
+                
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        if part.get_content_type() == 'text/plain':
+                            cuerpo = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                            break
+                else:
+                    cuerpo = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+                
+                texto_completo = f"{asunto}\n{cuerpo}"
+                especialidad = detectar_especialidad(texto_completo)
+                
+                # Asignar agente según la cuenta de correo
+                if "ventas" in email_user:
+                    agente_id = AGENTE_LUCIA_ID  # 54
+                    perfil = "lucia"
+                else:
+                    agente_id = AGENTE_ORION_ID   # 55
+                    perfil = "orion"
+                
+                # Crear tarea en la BD
+                crear_tarea_en_bd(remitente, asunto, agente_id)
+                
+                # Generar y enviar respuesta
+                respuesta = generar_respuesta(cuerpo, perfil)
+                if enviar_correo(remitente, f"Re: {asunto}", respuesta, email_user, email_password):
+                    mail.store(email_id, '+FLAGS', '\\Seen')
+                    procesados += 1
+                
+            except Exception as e:
+                print(f"❌ Error procesando correo en {email_user}: {e}")
+                continue
+        
+        mail.close()
+        mail.logout()
+        return {'cuenta': email_user, 'status': 'ok', 'procesados': procesados}
+        
+    except Exception as e:
+        return {'cuenta': email_user, 'status': 'error', 'message': str(e)}
+        
 def generar_respuesta(user_message, perfil):
     try:
         import ollama
