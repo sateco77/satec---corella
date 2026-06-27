@@ -229,6 +229,9 @@ def crear_tarea_en_bd(remitente, asunto, agente_id):
             timeout=10
         )
         
+        logger.info(f"📡 CSRF Response status: {token_response.status_code}")
+        logger.info(f"📡 CSRF Response text: {token_response.text[:200]}")
+        
         if token_response.status_code != 200:
             logger.error(f"❌ Error obteniendo CSRF: {token_response.status_code}")
             return False
@@ -237,27 +240,34 @@ def crear_tarea_en_bd(remitente, asunto, agente_id):
         csrf_token = token_data.get('csrf_token')
         
         if not csrf_token:
-            logger.error("❌ No se recibió CSRF token")
+            logger.error(f"❌ No se recibió CSRF token. Respuesta: {token_response.text}")
             return False
             
-        logger.info("✅ CSRF token obtenido")
+        logger.info(f"✅ CSRF token obtenido: {csrf_token[:20]}...")
         
         # 2. Crear tarea con el token
         texto_tarea = f"Correo de {remitente}: {asunto[:50]}..."
         
+        payload = {
+            'texto': texto_tarea,
+            'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
+            'asignada_a': agente_id,
+            'asignada_por': 1,
+            'fuente': 'correo',
+            'csrf_token': csrf_token
+        }
+        
+        logger.info(f"📤 Enviando tarea: {texto_tarea[:50]}...")
+        
         response = requests.post(
             f"{api_url}?path=tareas",
-            json={
-                'texto': texto_tarea,
-                'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
-                'asignada_a': agente_id,
-                'asignada_por': 1,
-                'fuente': 'correo',
-                'csrf_token': csrf_token  # ← Agregar el token aquí
-            },
+            json=payload,
             timeout=30,
             headers={'Content-Type': 'application/json'}
         )
+        
+        logger.info(f"📡 Tarea Response status: {response.status_code}")
+        logger.info(f"📡 Tarea Response text: {response.text[:200]}")
         
         if response.status_code == 200:
             data = response.json()
