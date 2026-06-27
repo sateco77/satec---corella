@@ -56,36 +56,31 @@ AGENTE_ORION_ID = int(os.environ.get('AGENTE_ORION_ID', 55))
 # ============================================================
 
 PERFILES = {
-    "agata": {
-        "id": "agata",
-        "nombre": "Ágata",
-        "rol": "Ventas y Marketing",
-        "emoji": "📊",
-        "palabras_clave": ["comprar", "cotizar", "precio", "oferta", "descuento", "promocion", "venta", "costo"],
-        "prompt": "Eres ÁGATA, experta en Ventas y Marketing de SATEC. Tono persuasivo y entusiasta."
+    'gps': {
+        'palabras': ['gps', 'rastreo', 'flota', 'geocerca', 'corte motor', 'localización', 'vehículo', 'tracking'],
+        'agente_id': 53,  # ← ÁGATA (ID REAL)
+        'nombre': 'Ágata (IA)'
     },
-    "lucia": {
-        "id": "lucia",
-        "nombre": "Lucía",
-        "rol": "Atención al Cliente",
-        "emoji": "💬",
-        "palabras_clave": ["demo", "ayuda", "duda", "consultar", "atencion", "cliente", "servicio"],
-        "prompt": "Eres LUCÍA, experta en Atención al Cliente de SATEC. Tono cálido y empático."
+    'cctv': {
+        'palabras': ['cámara', 'video', 'vigilancia', 'cctv', 'movimiento', 'perimetral', 'grabación', 'ia', 'reconocimiento'],
+        'agente_id': 54,  # ← LUCÍA (ID REAL)
+        'nombre': 'Lucía (IA)'
     },
-    "orion": {
-        "id": "orion",
-        "nombre": "Orion",
-        "rol": "Soporte Técnico",
-        "emoji": "🔧",
-        "palabras_clave": ["falla", "error", "problema", "no funciona", "instalar", "configurar", "técnico"],
-        "prompt": "Eres ORION, experto en Soporte Técnico de SATEC. Tono técnico pero claro."
+    'access': {
+        'palabras': ['acceso', 'biometría', 'huella', 'qr', 'tarjeta', 'lector', 'control acceso', 'credencial'],
+        'agente_id': 54,  # ← LUCÍA también (ID REAL)
+        'nombre': 'Lucía (IA)'
+    },
+    'chip_taxi': {
+        'palabras': ['taxi', 'viaje', 'app', 'conductor', 'chip taxi', 'pasajero', 'solicitar viaje', 'tarifa'],
+        'agente_id': 53,  # ← ÁGATA (ID REAL)
+        'nombre': 'Ágata (IA)'
+    },
+    'soporte': {
+        'palabras': ['falla', 'error', 'problema', 'no funciona', 'instalar', 'configurar', 'técnico', 'ayuda'],
+        'agente_id': 55,  # ← ORION (ID REAL)
+        'nombre': 'Orion (IA)'
     }
-}
-
-FALLBACK_RESPUESTAS = {
-    "agata": "📊 ¡Gracias por contactar a SATEC! Soy Ágata, tu asesora de ventas. 🚀",
-    "lucia": "💬 Soy Lucía, tu asesora de atención al cliente. ¿En qué puedo ayudarte? ❤️",
-    "orion": "🔧 Soy Orion, tu técnico de soporte. ¿Puedes darme más detalles? 💻"
 }
 
 # ============================================================
@@ -383,6 +378,111 @@ def enviar_heartbeat():
 
 # Iniciar el heartbeat en un hilo separado
 threading.Thread(target=enviar_heartbeat, daemon=True).start()
+
+def leer_correos():
+    """Lee correos no leídos de ambas cuentas"""
+    cuentas = [
+        {'email': EMAIL_USER, 'password': EMAIL_PASSWORD, 'nombre': 'Orion'},
+        {'email': EMAIL_VENTAS, 'password': EMAIL_VENTAS_PASSWORD, 'nombre': 'Lucía'}
+    ]
+    
+    for cuenta in cuentas:
+        logger.info(f"📡 Revisando cuenta: {cuenta['email']}")
+        try:
+            context = ssl.create_default_context()
+            mail = imaplib.IMAP4_SSL(IMAP_SERVER, 993, ssl_context=context)
+            mail.login(cuenta['email'], cuenta['password'])
+            mail.select('INBOX')
+            
+            result, data = mail.search(None, 'UNSEEN')
+            correos_ids = data[0].split()
+            
+            logger.info(f"📧 {cuenta['email']}: {len(correos_ids)} correos no leídos")
+            
+            for email_id in correos_ids:
+                procesar_correo_individual(mail, email_id, cuenta['nombre'])
+            
+            mail.close()
+            mail.logout()
+            
+        except Exception as e:
+            logger.error(f"❌ Error en cuenta {cuenta['email']}: {e}")
+
+def procesar_correo_individual(mail, email_id, nombre_cuenta):
+    """Procesa un correo individual y asigna tarea"""
+    try:
+        result, msg_data = mail.fetch(email_id, '(RFC822)')
+        msg = email.message_from_bytes(msg_data[0][1])
+        
+        remitente = msg['From']
+        asunto = msg['Subject']
+        cuerpo = ""
+        
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_type() == 'text/plain':
+                    cuerpo = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                    break
+        else:
+            cuerpo = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+        
+        logger.info(f"📧 De: {remitente} | Asunto: {asunto}")
+        
+        texto_completo = f"{asunto}\n{cuerpo}"
+        especialidad = detectar_especialidad(texto_completo)
+        
+        # Si no detecta especialidad, asignar según la cuenta
+        if not especialidad:
+            if nombre_cuenta == 'Orion':
+                especialidad = 'soporte'
+            else:
+                especialidad = 'cctv'  # Default para ventas
+        
+        if especialidad and especialidad in ESPECIALIDADES:
+            agente = ESPECIALIDADES[especialidad]
+            logger.info(f"✅ Asignando a {agente['nombre']} (ID: {agente['agente_id']})")
+            
+            # Crear tarea en la BD
+            try:
+                conn = mysql.connector.connect(
+                    host=DB_HOST,
+                    user=DB_USER,
+                    password=DB_PASSWORD,
+                    database=DB_NAME
+                )
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO tareas (texto, fecha_limite, asignada_por, asignada_a, fuente)
+                    VALUES (%s, DATE_ADD(CURDATE(), INTERVAL 1 DAY), %s, %s, 'correo')
+                """, (f"Correo de {remitente}: {asunto}", 1, agente['agente_id']))
+                conn.commit()
+                tarea_id = cursor.lastrowid
+                cursor.close()
+                conn.close()
+                logger.info(f"📋 Tarea creada (ID: {tarea_id})")
+            except Exception as e:
+                logger.error(f"❌ Error creando tarea: {e}")
+            
+            # Generar respuesta
+            prompt_data = obtener_prompt_agente(agente['agente_id'])
+            respuesta = responder_con_ollama(
+                prompt_data['prompt_sistema'], 
+                cuerpo, 
+                prompt_data['modelo'],
+                prompt_data.get('temperatura', 0.3)
+            )
+            
+            # Enviar respuesta
+            enviar_respuesta(remitente, asunto, respuesta)
+            logger.info(f"✉️ Respuesta enviada a {remitente}")
+            
+            # Marcar como leído
+            mail.store(email_id, '+FLAGS', '\\Seen')
+        else:
+            logger.warning("⚠️ No se pudo clasificar el correo")
+            
+    except Exception as e:
+        logger.error(f"❌ Error procesando correo: {e}")
 
 # ============================================================
 # INICIO
