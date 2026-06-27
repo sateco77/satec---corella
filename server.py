@@ -217,44 +217,56 @@ def enviar_correo(para, asunto, mensaje, email_user, email_password):
 # FUNCIÓN PARA CREAR TAREA VÍA API DE HOSTINGER
 # ============================================================
 def crear_tarea_en_bd(remitente, asunto, agente_id):
-    """Crea una tarea usando ?path= (formato que funciona en Hostinger)"""
+    """Crea una tarea usando el formato PATH_INFO que tu PowerShell confirmó funcional"""
     try:
-        # 🔴 ANTES: "https://peru-clam-144838.hostingersite.com/crm/api_crm.php/tarea_agente"
-        # 🟢 AHORA: Cambiado para usar el parámetro ?path= correcto
-        api_url = "https://peru-clam-144838.hostingersite.com/crm/api_crm.php?path=tarea_agente"
+        # 🟢 Usamos la barra diagonal porque tu servidor valida las rutas con PATH_INFO
+        api_url = "https://peru-clam-144838.hostingersite.com/crm/api_crm.php/tarea_agente"
         
         texto_tarea = f"Correo de {remitente}: {asunto[:50]}..."
         
-        logger.info(f"📤 Enviando tarea para agente {agente_id}...")
+        logger.info(f"📤 Enviando tarea para agente {agente_id} vía POST a {api_url}...")
+        
+        # Estructuramos el payload exactamente como lo espera el CRM
+        payload = {
+            'texto': texto_tarea,
+            'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
+            'asignada_a': int(agente_id),  # Nos aseguramos de que vaya como entero
+            'asignada_por': 1,
+            'fuente': 'correo'
+        }
         
         response = requests.post(
             api_url,
-            json={
-                'texto': texto_tarea,
-                'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
-                'asignada_a': agente_id,
-                'asignada_por': 1,
-                'fuente': 'correo'
-            },
+            json=payload,
             timeout=30,
-            headers={'Content-Type': 'application/json'}
+            headers={
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
         )
         
         logger.info(f"📡 Tarea Response status: {response.status_code}")
         logger.info(f"📡 Tarea Response: {response.text[:200]}")
         
         if response.status_code == 200:
-            data = response.json()
-            if data.get('success'):
-                logger.info(f"✅ Tarea creada para agente {agente_id} (ID: {data.get('id')})")
-                return True
-            else:
-                logger.error(f"❌ Error API: {data.get('error')}")
+            # Intentar decodificar la respuesta de la API
+            try:
+                data = response.json()
+                if data.get('success') or 'id' in data:
+                    logger.info(f"✅ Tarea creada para agente {agente_id}")
+                    return True
+                else:
+                    logger.error(f"❌ Error devuelto por la API del CRM: {data.get('error', 'Error desconocido')}")
+            except Exception as json_err:
+                # Si no es un JSON válido pero dio 200, veamos qué mandó
+                logger.warning(f"⚠️ La respuesta no es JSON válido pero el estado fue 200. Respuesta: {response.text}")
+                if "success" in response.text.lower():
+                    return True
         else:
-            logger.error(f"❌ API respondió con {response.status_code}")
+            logger.error(f"❌ API respondió con código de error: {response.status_code}")
             
     except Exception as e:
-        logger.error(f"❌ Error creando tarea: {e}")
+        logger.error(f"❌ Error crítico creando tarea: {e}")
     
     return False
 
