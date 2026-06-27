@@ -216,73 +216,46 @@ def enviar_correo(para, asunto, mensaje, email_user, email_password):
 # ============================================================
 # FUNCIÓN PARA CREAR TAREA VÍA API DE HOSTINGER
 # ============================================================
-
 def crear_tarea_en_bd(remitente, asunto, agente_id):
-    """Crea una tarea usando la API de Hostinger con CSRF token"""
+    """Crea una tarea usando el endpoint sin CSRF"""
     try:
         api_url = "https://peru-clam-144838.hostingersite.com/crm/api_crm.php"
         
-        # 1. Obtener token CSRF
-        logger.info("🔑 Obteniendo token CSRF...")
-        token_response = requests.get(
-            f"{api_url}?path=csrf_token",
-            timeout=10
-        )
-        
-        logger.info(f"📡 CSRF Response status: {token_response.status_code}")
-        logger.info(f"📡 CSRF Response text: {token_response.text[:200]}")
-        
-        if token_response.status_code != 200:
-            logger.error(f"❌ Error obteniendo CSRF: {token_response.status_code}")
-            return False
-            
-        token_data = token_response.json()
-        csrf_token = token_data.get('csrf_token')
-        
-        if not csrf_token:
-            logger.error(f"❌ No se recibió CSRF token. Respuesta: {token_response.text}")
-            return False
-            
-        logger.info(f"✅ CSRF token obtenido: {csrf_token[:20]}...")
-        
-        # 2. Crear tarea con el token
         texto_tarea = f"Correo de {remitente}: {asunto[:50]}..."
         
-        payload = {
-            'texto': texto_tarea,
-            'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
-            'asignada_a': agente_id,
-            'asignada_por': 1,
-            'fuente': 'correo',
-            'csrf_token': csrf_token
-        }
-        
-        logger.info(f"📤 Enviando tarea: {texto_tarea[:50]}...")
+        logger.info(f"📤 Enviando tarea para agente {agente_id}...")
         
         response = requests.post(
-            f"{api_url}?path=tareas",
-            json=payload,
+            f"{api_url}?path=tarea_agente",
+            json={
+                'texto': texto_tarea,
+                'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
+                'asignada_a': agente_id,
+                'asignada_por': 1,
+                'fuente': 'correo'
+            },
             timeout=30,
             headers={'Content-Type': 'application/json'}
         )
         
         logger.info(f"📡 Tarea Response status: {response.status_code}")
-        logger.info(f"📡 Tarea Response text: {response.text[:200]}")
+        logger.info(f"📡 Tarea Response: {response.text[:200]}")
         
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
-                logger.info(f"✅ Tarea creada para agente {agente_id} (ID: {data.get('id', 'N/A')})")
+                logger.info(f"✅ Tarea creada para agente {agente_id} (ID: {data.get('id')})")
                 return True
             else:
                 logger.error(f"❌ Error API: {data.get('error')}")
         else:
-            logger.error(f"❌ API respondió con {response.status_code}: {response.text}")
+            logger.error(f"❌ API respondió con {response.status_code}")
             
     except Exception as e:
         logger.error(f"❌ Error creando tarea: {e}")
     
     return False
+
 
 
 def generar_respuesta(user_message, perfil):
