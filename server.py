@@ -30,13 +30,21 @@ CORS(app)
 PORT = int(os.environ.get("PORT", 10000))
 
 # ============================================================
-# CONFIGURACIÓN DE CORREO (desde variables de entorno)
+# CONFIGURACIÓN DE CORREO (MÚLTIPLES CUENTAS)
 # ============================================================
 
+# Cuenta 1: ORION (Soporte - contacto@satecnetwork.com)
 EMAIL_USER = os.environ.get('EMAIL_USER', 'contacto@satecnetwork.com')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+
+# Cuenta 2: LUCÍA (Ventas - ventas@satecnetwork.com)
+EMAIL_VENTAS = os.environ.get('EMAIL_VENTAS', 'ventas@satecnetwork.com')
+EMAIL_VENTAS_PASSWORD = os.environ.get('PASSWORD_VENTAS', '')
+
 IMAP_SERVER = os.environ.get('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.hostinger.com')
+
+
 
 # IDs de agentes en la base de datos (IDs REALES de tu tabla)
 AGENTE_AGATA_ID = int(os.environ.get('AGENTE_AGATA_ID', 53))
