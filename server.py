@@ -38,10 +38,10 @@ EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 IMAP_SERVER = os.environ.get('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.hostinger.com')
 
-# IDs de agentes en la base de datos (ajústalos según tu BD)
-AGENTE_AGATA_ID = int(os.environ.get('AGENTE_AGATA_ID', 4))
-AGENTE_LUCIA_ID = int(os.environ.get('AGENTE_LUCIA_ID', 5))
-AGENTE_ORION_ID = int(os.environ.get('AGENTE_ORION_ID', 6))
+# IDs de agentes en la base de datos (IDs REALES de tu tabla)
+AGENTE_AGATA_ID = int(os.environ.get('AGENTE_AGATA_ID', 53))
+AGENTE_LUCIA_ID = int(os.environ.get('AGENTE_LUCIA_ID', 54))
+AGENTE_ORION_ID = int(os.environ.get('AGENTE_ORION_ID', 55))
 
 # ============================================================
 # PERFILES DE AGENTES
@@ -114,11 +114,11 @@ def detectar_especialidad(texto):
 
 def get_agente_por_especialidad(especialidad):
     mapeo = {
-        'gps': AGENTE_AGATA_ID,
-        'chip_taxi': AGENTE_AGATA_ID,
-        'cctv': AGENTE_LUCIA_ID,
-        'access': AGENTE_LUCIA_ID,
-        'soporte': AGENTE_ORION_ID
+        'gps': AGENTE_AGATA_ID,       # 53 (Ágata)
+        'chip_taxi': AGENTE_AGATA_ID, # 53 (Ágata)
+        'cctv': AGENTE_LUCIA_ID,      # 54 (Lucía)
+        'access': AGENTE_LUCIA_ID,    # 54 (Lucía)
+        'soporte': AGENTE_ORION_ID    # 55 (Orion)
     }
     return mapeo.get(especialidad, AGENTE_LUCIA_ID)
 
