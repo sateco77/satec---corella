@@ -219,8 +219,9 @@ def enviar_correo(para, asunto, mensaje, email_user, email_password):
 def crear_tarea_en_bd(remitente, asunto, agente_id):
     """Crea una tarea usando ?path= (formato que funciona en Hostinger)"""
     try:
-        # Usar ?path= en lugar de PATH_INFO
-        api_url = "https://peru-clam-144838.hostingersite.com/crm/api_crm.php/tarea_agente"
+        # 🔴 ANTES: "https://peru-clam-144838.hostingersite.com/crm/api_crm.php/tarea_agente"
+        # 🟢 AHORA: Cambiado para usar el parámetro ?path= correcto
+        api_url = "https://peru-clam-144838.hostingersite.com/crm/api_crm.php?path=tarea_agente"
         
         texto_tarea = f"Correo de {remitente}: {asunto[:50]}..."
         
