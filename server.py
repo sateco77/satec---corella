@@ -213,25 +213,43 @@ def enviar_correo(para, asunto, mensaje, email_user, email_password):
         logger.error(f"❌ Error SMTP: {e}")
         return False
 
+# ============================================================
+# FUNCIÓN PARA CREAR TAREA VÍA API DE HOSTINGER
+# ============================================================
+
 def crear_tarea_en_bd(remitente, asunto, agente_id):
+    """Crea una tarea usando la API de Hostinger"""
     try:
-        import mysql.connector
-        conn = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
+        api_url = "https://peru-clam-144838.hostingersite.com/crm/api_crm.php"
+        
+        texto_tarea = f"Correo de {remitente}: {asunto[:50]}..."
+        
+        logger.info(f"📤 Creando tarea vía API para agente {agente_id}")
+        
+        response = requests.post(
+            f"{api_url}?path=tareas",
+            json={
+                'texto': texto_tarea,
+                'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
+                'asignada_a': agente_id,
+                'asignada_por': 1,
+                'fuente': 'correo'
+            },
+            timeout=30
         )
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO tareas (texto, fecha_limite, asignada_por, asignada_a, fuente)
-            VALUES (%s, DATE_ADD(CURDATE(), INTERVAL 1 DAY), %s, %s, 'correo')
-        """, (f"Correo de {remitente}: {asunto[:50]}...", 1, agente_id))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        logger.info(f"✅ Tarea creada para agente {agente_id}")
-        return True
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                logger.info(f"✅ Tarea creada para agente {agente_id}")
+                return True
+            else:
+                logger.error(f"❌ Error API: {data.get('error')}")
+                return False
+        else:
+            logger.error(f"❌ API respondió con {response.status_code}: {response.text}")
+            return False
+            
     except Exception as e:
         logger.error(f"❌ Error creando tarea: {e}")
         return False
