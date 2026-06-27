@@ -273,6 +273,7 @@ def generar_respuesta(user_message, perfil):
 
 def procesar_correo_individual(mail, email_id, nombre_cuenta):
     """Procesa un correo individual y asigna tarea según la cuenta de correo"""
+    logger.info(f"🔍 PROCESANDO CORREO - email_id: {email_id}, cuenta: {nombre_cuenta}")
     try:
         result, msg_data = mail.fetch(email_id, '(RFC822)')
         msg = email.message_from_bytes(msg_data[0][1])
@@ -290,61 +291,44 @@ def procesar_correo_individual(mail, email_id, nombre_cuenta):
             cuerpo = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
         
         logger.info(f"📧 De: {remitente} | Asunto: {asunto}")
+        logger.info(f"📝 Cuerpo (primeros 100 caracteres): {cuerpo[:100]}...")
         
-        # =====================================================
-        # ASIGNACIÓN POR CUENTA DE CORREO (NO POR ESPECIALIDAD)
-        # =====================================================
-        texto_completo = f"{asunto}\n{cuerpo}"
+        # ASIGNACIÓN POR CUENTA DE CORREO
+        agente_id = None
+        perfil = None
         
-        # Determinar qué agente debe atender según la cuenta de correo
-        if "ventas" in nombre_cuenta.lower() or "ventas" in email_user.lower():
-            # Lucía atiende ventas@satecnetwork.com
+        if "ventas" in nombre_cuenta.lower() or "ventas" in EMAIL_VENTAS.lower():
             agente_id = AGENTE_LUCIA_ID  # 54
             perfil = "lucia"
             logger.info(f"✅ Asignando a Lucía (ID: {agente_id}) - Correo de VENTAS")
-        elif "contacto" in nombre_cuenta.lower() or "contacto" in email_user.lower():
-            # Orion atiende contacto@satecnetwork.com
+        elif "contacto" in nombre_cuenta.lower() or "contacto" in EMAIL_USER.lower():
             agente_id = AGENTE_ORION_ID  # 55
             perfil = "orion"
             logger.info(f"✅ Asignando a Orion (ID: {agente_id}) - Correo de CONTACTO")
         else:
-            # Por defecto, asignar a Lucía (ventas)
             agente_id = AGENTE_LUCIA_ID  # 54
             perfil = "lucia"
             logger.info(f"✅ Asignando a Lucía (ID: {agente_id}) - Correo por defecto")
         
-        # Crear tarea en la BD
+        # CREAR TAREA
+        logger.info(f"📤 Creando tarea para agente {agente_id}...")
         tarea_creada = crear_tarea_en_bd(remitente, asunto, agente_id)
         
         if tarea_creada:
-            # Enviar respuesta de confirmación
-            respuesta = generar_respuesta_simple(perfil)
-            
-            # Obtener la cuenta de correo correcta
-            if perfil == 'orion':
-                email_from = EMAIL_USER
-                password_from = EMAIL_PASSWORD
-            else:
-                email_from = EMAIL_VENTAS
-                password_from = EMAIL_VENTAS_PASSWORD
-            
-            if enviar_correo(remitente, f"Re: {asunto}", respuesta, email_from, password_from):
-                mail.store(email_id, '+FLAGS', '\\Seen')
-                logger.info(f"✉️ Respuesta enviada a {remitente} desde {email_from}")
-            else:
-                logger.warning(f"⚠️ No se pudo enviar respuesta a {remitente}")
+            logger.info(f"✅ Tarea creada exitosamente para {remitente}")
+            # Marcar como leído
+            mail.store(email_id, '+FLAGS', '\\Seen')
         else:
-            logger.error(f"❌ No se pudo crear la tarea para {remitente}")
+            logger.error(f"❌ Falló la creación de tarea para {remitente}")
             
     except Exception as e:
         logger.error(f"❌ Error procesando correo: {e}")
 
 def leer_correos():
-    """Lee correos no leídos de ambas cuentas"""
+    """Lee TODOS los correos (no solo los no leídos) para depuración"""
     cuentas = [
         {'email': EMAIL_USER, 'password': EMAIL_PASSWORD, 'nombre': 'Orion'},
-        {'email': EMAIL_VENTAS, 'password': EMAIL_VENTAS_PASSWORD, 'nombre': 'Lucía'},
-        {'email': EMAIL_AGATA, 'password': EMAIL_AGATA_PASSWORD, 'nombre': 'Ágata'}
+        {'email': EMAIL_VENTAS, 'password': EMAIL_VENTAS_PASSWORD, 'nombre': 'Lucía'}
     ]
     
     for cuenta in cuentas:
@@ -357,12 +341,23 @@ def leer_correos():
             if not mail:
                 continue
             
-            result, data = mail.search(None, 'UNSEEN')
+            # CAMBIADO: Buscar TODOS los correos
+            result, data = mail.search(None, 'ALL')
             correos_ids = data[0].split()
             
-            logger.info(f"📧 {cuenta['email']}: {len(correos_ids)} correos no leídos")
+            logger.info(f"📧 {cuenta['email']}: {len(correos_ids)} correos TOTALES encontrados")
             
-            for email_id in correos_ids:
+            if len(correos_ids) == 0:
+                logger.info(f"📭 No hay correos en {cuenta['email']}")
+                mail.close()
+                mail.logout()
+                continue
+            
+            # Procesar los últimos 10 correos (para depuración)
+            correos_a_procesar = correos_ids[-10:]
+            logger.info(f"📨 Procesando {len(correos_a_procesar)} correos de {cuenta['email']}")
+            
+            for email_id in correos_a_procesar:
                 procesar_correo_individual(mail, email_id, cuenta['nombre'])
             
             mail.close()
@@ -370,6 +365,8 @@ def leer_correos():
             
         except Exception as e:
             logger.error(f"❌ Error en cuenta {cuenta['email']}: {e}")
+
+
 def procesar_correos():
     """Wrapper para procesar correos desde el endpoint"""
     logger.info("📬 Procesando correos...")
