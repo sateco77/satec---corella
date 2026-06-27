@@ -218,13 +218,32 @@ def enviar_correo(para, asunto, mensaje, email_user, email_password):
 # ============================================================
 
 def crear_tarea_en_bd(remitente, asunto, agente_id):
-    """Crea una tarea usando la API de Hostinger"""
+    """Crea una tarea usando la API de Hostinger con CSRF token"""
     try:
         api_url = "https://peru-clam-144838.hostingersite.com/crm/api_crm.php"
         
-        texto_tarea = f"Correo de {remitente}: {asunto[:50]}..."
+        # 1. Obtener token CSRF
+        logger.info("🔑 Obteniendo token CSRF...")
+        token_response = requests.get(
+            f"{api_url}?path=csrf_token",
+            timeout=10
+        )
         
-        logger.info(f"📤 Creando tarea vía API para agente {agente_id}")
+        if token_response.status_code != 200:
+            logger.error(f"❌ Error obteniendo CSRF: {token_response.status_code}")
+            return False
+            
+        token_data = token_response.json()
+        csrf_token = token_data.get('csrf_token')
+        
+        if not csrf_token:
+            logger.error("❌ No se recibió CSRF token")
+            return False
+            
+        logger.info("✅ CSRF token obtenido")
+        
+        # 2. Crear tarea con el token
+        texto_tarea = f"Correo de {remitente}: {asunto[:50]}..."
         
         response = requests.post(
             f"{api_url}?path=tareas",
@@ -233,26 +252,27 @@ def crear_tarea_en_bd(remitente, asunto, agente_id):
                 'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
                 'asignada_a': agente_id,
                 'asignada_por': 1,
-                'fuente': 'correo'
+                'fuente': 'correo',
+                'csrf_token': csrf_token  # ← Agregar el token aquí
             },
-            timeout=30
+            timeout=30,
+            headers={'Content-Type': 'application/json'}
         )
         
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
-                logger.info(f"✅ Tarea creada para agente {agente_id}")
+                logger.info(f"✅ Tarea creada para agente {agente_id} (ID: {data.get('id', 'N/A')})")
                 return True
             else:
                 logger.error(f"❌ Error API: {data.get('error')}")
-                return False
         else:
             logger.error(f"❌ API respondió con {response.status_code}: {response.text}")
-            return False
             
     except Exception as e:
         logger.error(f"❌ Error creando tarea: {e}")
-        return False
+    
+    return False
 
 
 def generar_respuesta(user_message, perfil):
@@ -298,40 +318,44 @@ def procesar_correo_individual(mail, email_id, nombre_cuenta):
             elif nombre_cuenta == 'Ágata' or 'agata' in nombre_cuenta.lower():
                 especialidad = 'gps'
             else:
-                especialidad = 'cctv'  # Default para ventas
+                especialidad = 'cctv'
         
         if especialidad and especialidad in ESPECIALIDADES:
             agente = ESPECIALIDADES[especialidad]
             logger.info(f"✅ Asignando a {agente['nombre']} (ID: {agente['agente_id']})")
             
-            # Crear tarea en la BD
-            crear_tarea_en_bd(remitente, asunto, agente['agente_id'])
+            # Crear tarea en la BD (con CSRF)
+            tarea_creada = crear_tarea_en_bd(remitente, asunto, agente['agente_id'])
             
-            # Generar y enviar respuesta
-            perfil = agente['perfil']
-            respuesta = generar_respuesta(cuerpo, perfil)
-            
-            # Obtener la cuenta de correo correcta para enviar
-            if perfil == 'orion':
-                email_from = EMAIL_USER
-                password_from = EMAIL_PASSWORD
-            elif perfil == 'agata':
-                email_from = EMAIL_AGATA if EMAIL_AGATA else EMAIL_USER
-                password_from = EMAIL_AGATA_PASSWORD if EMAIL_AGATA_PASSWORD else EMAIL_PASSWORD
+            if tarea_creada:
+                # Enviar respuesta de confirmación (sin Ollama)
+                perfil = agente['perfil']
+                respuesta = generar_respuesta_simple(perfil)
+                
+                # Obtener la cuenta de correo correcta
+                if perfil == 'orion':
+                    email_from = EMAIL_USER
+                    password_from = EMAIL_PASSWORD
+                elif perfil == 'agata':
+                    email_from = EMAIL_AGATA if EMAIL_AGATA else EMAIL_USER
+                    password_from = EMAIL_AGATA_PASSWORD if EMAIL_AGATA_PASSWORD else EMAIL_PASSWORD
+                else:
+                    email_from = EMAIL_VENTAS
+                    password_from = EMAIL_VENTAS_PASSWORD
+                
+                if enviar_correo(remitente, f"Re: {asunto}", respuesta, email_from, password_from):
+                    mail.store(email_id, '+FLAGS', '\\Seen')
+                    logger.info(f"✉️ Respuesta enviada a {remitente} desde {email_from}")
+                else:
+                    logger.warning(f"⚠️ No se pudo enviar respuesta a {remitente}")
             else:
-                email_from = EMAIL_VENTAS
-                password_from = EMAIL_VENTAS_PASSWORD
-            
-            if enviar_correo(remitente, f"Re: {asunto}", respuesta, email_from, password_from):
-                mail.store(email_id, '+FLAGS', '\\Seen')
-                logger.info(f"✉️ Respuesta enviada a {remitente} desde {email_from}")
-            else:
-                logger.warning(f"⚠️ No se pudo enviar respuesta a {remitente}")
+                logger.error(f"❌ No se pudo crear la tarea para {remitente}")
         else:
             logger.warning("⚠️ No se pudo clasificar el correo")
             
     except Exception as e:
         logger.error(f"❌ Error procesando correo: {e}")
+
 
 def leer_correos():
     """Lee correos no leídos de ambas cuentas"""
