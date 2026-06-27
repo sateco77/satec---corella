@@ -254,33 +254,19 @@ def crear_tarea_en_bd(remitente, asunto, agente_id):
         logger.error(f"❌ Error creando tarea: {e}")
         return False
 
+
 def generar_respuesta(user_message, perfil):
-    """Genera respuesta usando Ollama API o fallback"""
+    """Genera respuesta usando respuestas predefinidas (fallback)"""
     perfil_data = PERFILES.get(perfil, PERFILES["lucia"])
-    full_prompt = f"{perfil_data['prompt']}\n\nCliente: {user_message}\n\nAsistente:"
     
-    # Intentar usar Ollama API (versión HTTP)
-    try:
-        response = requests.post(
-            'http://localhost:11434/api/generate',
-            json={
-                'model': 'llama3.2:latest',
-                'prompt': full_prompt,
-                'stream': False,
-                'options': {'temperature': 0.3}
-            },
-            timeout=30
-        )
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('response'):
-                logger.info("✅ Respuesta generada con Ollama")
-                return data['response']
-    except Exception as e:
-        logger.warning(f"⚠️ Ollama no disponible: {e}")
+    # Respuestas predefinidas según el perfil
+    respuestas = {
+        'agata': f"📊 ¡Hola! Soy Ágata, tu asesora de ventas. He recibido tu mensaje y lo he derivado al área correspondiente. Un asesor se pondrá en contacto contigo en las próximas 24 horas. ¡Gracias por contactar a SATEC! 🚀",
+        'lucia': f"💬 ¡Hola! Soy Lucía, tu asesora de atención al cliente. Tu consulta ha sido registrada y un especialista te responderá a la brevedad. ¿Necesitas algo más? ❤️",
+        'orion': f"🔧 ¡Hola! Soy Orion, tu técnico de soporte. He recibido tu reporte y ya está siendo analizado por nuestro equipo. Te notificaremos cuando tengamos una solución. 💻"
+    }
     
-    # Fallback: respuestas predefinidas
-    return FALLBACK_RESPUESTAS.get(perfil, FALLBACK_RESPUESTAS["lucia"])
+    return respuestas.get(perfil, FALLBACK_RESPUESTAS.get(perfil, "Hemos recibido tu mensaje. Un asesor te contactará pronto."))
 
 def procesar_correo_individual(mail, email_id, nombre_cuenta):
     """Procesa un correo individual y asigna tarea"""
