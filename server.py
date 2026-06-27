@@ -272,7 +272,7 @@ def generar_respuesta(user_message, perfil):
     return respuestas.get(perfil, FALLBACK_RESPUESTAS.get(perfil, "Hemos recibido tu mensaje. Un asesor te contactará pronto."))
 
 def procesar_correo_individual(mail, email_id, nombre_cuenta):
-    """Procesa un correo individual y asigna tarea"""
+    """Procesa un correo individual y asigna tarea según la cuenta de correo"""
     try:
         result, msg_data = mail.fetch(email_id, '(RFC822)')
         msg = email.message_from_bytes(msg_data[0][1])
@@ -291,54 +291,53 @@ def procesar_correo_individual(mail, email_id, nombre_cuenta):
         
         logger.info(f"📧 De: {remitente} | Asunto: {asunto}")
         
+        # =====================================================
+        # ASIGNACIÓN POR CUENTA DE CORREO (NO POR ESPECIALIDAD)
+        # =====================================================
         texto_completo = f"{asunto}\n{cuerpo}"
-        especialidad = detectar_especialidad(texto_completo)
         
-        # Si no detecta especialidad, asignar según la cuenta
-        if not especialidad:
-            if nombre_cuenta == 'Orion' or 'contacto' in nombre_cuenta.lower():
-                especialidad = 'soporte'
-            elif nombre_cuenta == 'Ágata' or 'agata' in nombre_cuenta.lower():
-                especialidad = 'gps'
-            else:
-                especialidad = 'cctv'
-        
-        if especialidad and especialidad in ESPECIALIDADES:
-            agente = ESPECIALIDADES[especialidad]
-            logger.info(f"✅ Asignando a {agente['nombre']} (ID: {agente['agente_id']})")
-            
-            # Crear tarea en la BD (con CSRF)
-            tarea_creada = crear_tarea_en_bd(remitente, asunto, agente['agente_id'])
-            
-            if tarea_creada:
-                # Enviar respuesta de confirmación (sin Ollama)
-                perfil = agente['perfil']
-                respuesta = generar_respuesta_simple(perfil)
-                
-                # Obtener la cuenta de correo correcta
-                if perfil == 'orion':
-                    email_from = EMAIL_USER
-                    password_from = EMAIL_PASSWORD
-                elif perfil == 'agata':
-                    email_from = EMAIL_AGATA if EMAIL_AGATA else EMAIL_USER
-                    password_from = EMAIL_AGATA_PASSWORD if EMAIL_AGATA_PASSWORD else EMAIL_PASSWORD
-                else:
-                    email_from = EMAIL_VENTAS
-                    password_from = EMAIL_VENTAS_PASSWORD
-                
-                if enviar_correo(remitente, f"Re: {asunto}", respuesta, email_from, password_from):
-                    mail.store(email_id, '+FLAGS', '\\Seen')
-                    logger.info(f"✉️ Respuesta enviada a {remitente} desde {email_from}")
-                else:
-                    logger.warning(f"⚠️ No se pudo enviar respuesta a {remitente}")
-            else:
-                logger.error(f"❌ No se pudo crear la tarea para {remitente}")
+        # Determinar qué agente debe atender según la cuenta de correo
+        if "ventas" in nombre_cuenta.lower() or "ventas" in email_user.lower():
+            # Lucía atiende ventas@satecnetwork.com
+            agente_id = AGENTE_LUCIA_ID  # 54
+            perfil = "lucia"
+            logger.info(f"✅ Asignando a Lucía (ID: {agente_id}) - Correo de VENTAS")
+        elif "contacto" in nombre_cuenta.lower() or "contacto" in email_user.lower():
+            # Orion atiende contacto@satecnetwork.com
+            agente_id = AGENTE_ORION_ID  # 55
+            perfil = "orion"
+            logger.info(f"✅ Asignando a Orion (ID: {agente_id}) - Correo de CONTACTO")
         else:
-            logger.warning("⚠️ No se pudo clasificar el correo")
+            # Por defecto, asignar a Lucía (ventas)
+            agente_id = AGENTE_LUCIA_ID  # 54
+            perfil = "lucia"
+            logger.info(f"✅ Asignando a Lucía (ID: {agente_id}) - Correo por defecto")
+        
+        # Crear tarea en la BD
+        tarea_creada = crear_tarea_en_bd(remitente, asunto, agente_id)
+        
+        if tarea_creada:
+            # Enviar respuesta de confirmación
+            respuesta = generar_respuesta_simple(perfil)
+            
+            # Obtener la cuenta de correo correcta
+            if perfil == 'orion':
+                email_from = EMAIL_USER
+                password_from = EMAIL_PASSWORD
+            else:
+                email_from = EMAIL_VENTAS
+                password_from = EMAIL_VENTAS_PASSWORD
+            
+            if enviar_correo(remitente, f"Re: {asunto}", respuesta, email_from, password_from):
+                mail.store(email_id, '+FLAGS', '\\Seen')
+                logger.info(f"✉️ Respuesta enviada a {remitente} desde {email_from}")
+            else:
+                logger.warning(f"⚠️ No se pudo enviar respuesta a {remitente}")
+        else:
+            logger.error(f"❌ No se pudo crear la tarea para {remitente}")
             
     except Exception as e:
         logger.error(f"❌ Error procesando correo: {e}")
-
 
 def leer_correos():
     """Lee correos no leídos de ambas cuentas"""
