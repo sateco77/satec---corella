@@ -160,6 +160,31 @@ def procesar_correos():
         'resultados': resultados
     }
 
+# ============================================================
+# FUNCIÓN PARA CREAR TAREA EN BD
+# ============================================================
+
+def crear_tarea_en_bd(remitente, asunto, agente_id):
+    try:
+        import mysql.connector
+        conn = mysql.connector.connect(
+            host=os.environ.get('DB_HOST'),
+            user=os.environ.get('DB_USER'),
+            password=os.environ.get('DB_PASSWORD'),
+            database=os.environ.get('DB_NAME', 'u416165369_corella_crm')
+        )
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO tareas (texto, fecha_limite, asignada_por, asignada_a, fuente)
+            VALUES (%s, DATE_ADD(CURDATE(), INTERVAL 1 DAY), %s, %s, 'correo')
+        """, (f"Correo de {remitente}: {asunto[:50]}...", 1, agente_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"✅ Tarea creada para agente {agente_id}")
+    except Exception as e:
+        print(f"❌ Error creando tarea: {e}")
+
 def procesar_una_cuenta(email_user, email_password, nombre_agente):
     mail = conectar_imap(email_user, email_password)
     if not mail:
