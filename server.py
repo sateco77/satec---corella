@@ -237,21 +237,31 @@ def crear_tarea_en_bd(remitente, asunto, agente_id):
         return False
 
 def generar_respuesta(user_message, perfil):
-    """Genera respuesta usando el perfil del agente"""
+    """Genera respuesta usando Ollama API o fallback"""
+    perfil_data = PERFILES.get(perfil, PERFILES["lucia"])
+    full_prompt = f"{perfil_data['prompt']}\n\nCliente: {user_message}\n\nAsistente:"
+    
+    # Intentar usar Ollama API (versión HTTP)
     try:
-        import ollama
-        perfil_data = PERFILES.get(perfil, PERFILES["lucia"])
-        full_prompt = f"{perfil_data['prompt']}\n\nCliente: {user_message}\n\nAsistente:"
-        response = ollama.generate(
-            model='llama3.2:latest',
-            prompt=full_prompt,
-            options={'temperature': 0.3}
+        response = requests.post(
+            'http://localhost:11434/api/generate',
+            json={
+                'model': 'llama3.2:latest',
+                'prompt': full_prompt,
+                'stream': False,
+                'options': {'temperature': 0.3}
+            },
+            timeout=30
         )
-        if response and response.get('response'):
-            return response['response']
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('response'):
+                logger.info("✅ Respuesta generada con Ollama")
+                return data['response']
     except Exception as e:
         logger.warning(f"⚠️ Ollama no disponible: {e}")
     
+    # Fallback: respuestas predefinidas
     return FALLBACK_RESPUESTAS.get(perfil, FALLBACK_RESPUESTAS["lucia"])
 
 def procesar_correo_individual(mail, email_id, nombre_cuenta):
