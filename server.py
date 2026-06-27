@@ -351,7 +351,7 @@ def leer_correos():
         if not cuenta['email'] or not cuenta['password']:
             continue
             
-        logger.info(f"📡 Revisando cuenta: {cuenta['email']}")
+        logger.info(f"📡 Revisando cuenta: {cuenta['email']} ({cuenta['nombre']})")
         try:
             mail = conectar_imap(cuenta['email'], cuenta['password'])
             if not mail:
@@ -370,7 +370,6 @@ def leer_correos():
             
         except Exception as e:
             logger.error(f"❌ Error en cuenta {cuenta['email']}: {e}")
-
 def procesar_correos():
     """Wrapper para procesar correos desde el endpoint"""
     logger.info("📬 Procesando correos...")
