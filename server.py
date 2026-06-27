@@ -217,16 +217,17 @@ def enviar_correo(para, asunto, mensaje, email_user, email_password):
 # FUNCIÓN PARA CREAR TAREA VÍA API DE HOSTINGER
 # ============================================================
 def crear_tarea_en_bd(remitente, asunto, agente_id):
-    """Crea una tarea usando el endpoint sin CSRF"""
+    """Crea una tarea usando PATH_INFO (ahora con el rewrite correcto)"""
     try:
-        api_url = "https://peru-clam-144838.hostingersite.com/crm/api_crm.php"
+        # Usar PATH_INFO (ahora el .htaccess lo convierte a ?path=)
+        api_url = "https://peru-clam-144838.hostingersite.com/crm/api_crm.php/tarea_agente"
         
         texto_tarea = f"Correo de {remitente}: {asunto[:50]}..."
         
         logger.info(f"📤 Enviando tarea para agente {agente_id}...")
         
         response = requests.post(
-            f"{api_url}?path=tarea_agente",
+            api_url,
             json={
                 'texto': texto_tarea,
                 'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
@@ -255,7 +256,6 @@ def crear_tarea_en_bd(remitente, asunto, agente_id):
         logger.error(f"❌ Error creando tarea: {e}")
     
     return False
-
 
 
 def generar_respuesta(user_message, perfil):
