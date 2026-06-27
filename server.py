@@ -25,6 +25,27 @@ from datetime import datetime
 # ============================================================
 
 app = Flask(__name__, static_folder='web')
+# ============================================================
+# RUTA PRINCIPAL (RAÍZ)
+# ============================================================
+
+@app.route('/')
+def home():
+    """Página de inicio o API de bienvenida"""
+    return jsonify({
+        'service': 'CORELLA SATEC',
+        'status': 'online',
+        'version': '3.0',
+        'perfiles': list(PERFILES.keys()),
+        'soporte': '+52 938 120 6643',
+        'endpoints': {
+            'chat': '/api/chat',
+            'perfiles': '/api/perfiles',
+            'health': '/api/health',
+            'procesar_correos': '/api/procesar_correos'
+        }
+    })
+
 CORS(app)
 
 PORT = int(os.environ.get("PORT", 10000))
