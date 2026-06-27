@@ -334,6 +334,57 @@ def health():
     })
 
 # ============================================================
+# FUNCIÓN PARA ENVIAR CORREO
+# ============================================================
+
+def enviar_correo(para, asunto, mensaje, email_user, email_password):
+    try:
+        msg = MIMEText(mensaje, 'plain', 'utf-8')
+        msg['Subject'] = asunto
+        msg['From'] = email_user
+        msg['To'] = para
+        
+        context = ssl.create_default_context()
+        server = smtplib.SMTP_SSL(SMTP_SERVER, 465, context=context)
+        server.login(email_user, email_password)
+        server.send_message(msg)
+        server.quit()
+        print(f"✅ Correo enviado a {para}")
+        return True
+    except Exception as e:
+        print(f"❌ Error SMTP: {e}")
+        return False
+
+# ============================================================
+# HEARTBEAT AL CRM
+# ============================================================
+
+def enviar_heartbeat():
+    crm_url = "https://satecnetwork.com/crm/api_crm.php"
+    while True:
+        try:
+            response = requests.post(
+                f"{crm_url}?path=agente_heartbeat",
+                json={
+                    'agente_id': 'corella_server',
+                    'perfiles': list(PERFILES.keys()),
+                    'estado': 'online',
+                    'timestamp': datetime.now().isoformat()
+                },
+                timeout=10
+            )
+            if response.status_code == 200:
+                print("💓 Heartbeat enviado")
+            else:
+                print(f"⚠️ Heartbeat falló: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Heartbeat falló: {e}")
+        time.sleep(30)
+
+# Iniciar el heartbeat en un hilo separado
+threading.Thread(target=enviar_heartbeat, daemon=True).start()
+
+# ============================================================
 # INICIO
 # ============================================================
 
