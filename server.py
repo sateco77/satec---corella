@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-CORELLA - Asistente IA Multiperfil con LECTOR DE CORREOS
+CORELLA - Asistente IA Multiperfil con LECTOR DE MÚLTIPLES CORREOS
+- contacto@satecnetwork.com -> ORION (Soporte, ID 55)
+- ventas@satecnetwork.com -> LUCÍA (Ventas, ID 54)
 """
 
 import os
@@ -30,13 +32,8 @@ CORS(app)
 PORT = int(os.environ.get("PORT", 10000))
 
 # ============================================================
-# CONFIGURACIÓN DE CORREO
+# CONFIGURACIÓN DE MÚLTIPLES CORREOS
 # ============================================================
-
-EMAIL_USER = os.environ.get('EMAIL_USER', 'contacto@satecnetwork.com')
-EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
-IMAP_SERVER = os.environ.get('IMAP_SERVER', 'imap.hostinger.com')
-SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.hostinger.com')
 
 # IDs de agentes en la base de datos
 AGENTE_AGATA_ID = 53
@@ -52,23 +49,56 @@ PERFILES = {
     "orion": {"id": "orion", "nombre": "Orion", "rol": "Soporte Técnico", "emoji": "🔧"}
 }
 
+# Configuración de cuentas de correo
+CUENTAS_CORREO = [
+    {
+        "email": os.environ.get('EMAIL_USER', 'contacto@satecnetwork.com'),
+        "password": os.environ.get('EMAIL_PASSWORD', ''),
+        "agente_id": AGENTE_ORION_ID,  # Orion
+        "nombre_agente": "Orion",
+        "imap_server": "imap.hostinger.com",
+        "smtp_server": "smtp.hostinger.com",
+        "descripcion": "Soporte Técnico"
+    },
+    {
+        "email": os.environ.get('EMAIL_VENTAS', 'ventas@satecnetwork.com'),
+        "password": os.environ.get('PASSWORD_VENTAS', ''),
+        "agente_id": AGENTE_LUCIA_ID,  # Lucía
+        "nombre_agente": "Lucía",
+        "imap_server": "imap.hostinger.com",
+        "smtp_server": "smtp.hostinger.com",
+        "descripcion": "Ventas"
+    }
+]
+
+# Mostrar configuración al iniciar
+print("📧 CUENTAS DE CORREO CONFIGURADAS:")
+for cuenta in CUENTAS_CORREO:
+    print(f"   - {cuenta['email']} → {cuenta['nombre_agente']} (ID: {cuenta['agente_id']}) para {cuenta['descripcion']}")
+
 # ============================================================
 # FUNCIONES DE CORREO
 # ============================================================
 
-def conectar_imap():
-    """Conecta al servidor IMAP"""
+def conectar_imap(email_user, email_password, imap_server):
+    """Conecta al servidor IMAP de una cuenta específica"""
     try:
+        print(f"📡 Conectando a IMAP para {email_user}...")
         context = ssl.create_default_context()
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER, 993, ssl_context=context)
-        mail.login(EMAIL_USER, EMAIL_PASSWORD)
+        mail = imaplib.IMAP4_SSL(imap_server, 993, ssl_context=context)
+        print(f"🔐 Intentando login con {email_user}...")
+        mail.login(email_user, email_password)
         mail.select('INBOX')
+        print(f"✅ Conectado a {email_user}")
         return mail
+    except imaplib.IMAP4.error as e:
+        print(f"❌ Error IMAP para {email_user}: {e}")
+        return None
     except Exception as e:
-        print(f"❌ Error IMAP: {e}")
+        print(f"❌ Error general para {email_user}: {e}")
         return None
 
-def crear_tarea_en_crm(remitente, asunto, cuerpo, agente_id=54):
+def crear_tarea_en_crm(remitente, asunto, cuerpo, agente_id):
     """Crea una tarea en el CRM vía API"""
     try:
         params = {'path': 'tareas'}
@@ -80,48 +110,51 @@ def crear_tarea_en_crm(remitente, asunto, cuerpo, agente_id=54):
             'fuente': 'correo'
         }
         
+        print(f"📤 Creando tarea para agente {agente_id}...")
         response = requests.post(CRM_API_URL, params=params, json=payload, timeout=15)
+        
         if response.status_code == 200:
             print(f"✅ Tarea creada para agente ID {agente_id}")
             return True
         else:
-            print(f"⚠️ Error creando tarea: {response.status_code}")
+            print(f"⚠️ Error creando tarea: {response.status_code} - {response.text}")
             return False
     except Exception as e:
         print(f"❌ Error API: {e}")
         return False
 
-def detectar_agente_por_correo(asunto, cuerpo):
-    """Detecta qué agente debe atender el correo"""
-    texto = (asunto + " " + cuerpo).lower()
+def procesar_correos_cuenta(cuenta):
+    """Lee correos no leídos de una cuenta específica y crea tareas"""
+    email_user = cuenta['email']
+    email_password = cuenta['password']
+    agente_id = cuenta['agente_id']
+    nombre_agente = cuenta['nombre_agente']
+    imap_server = cuenta['imap_server']
     
-    if "soporte" in texto or "problema" in texto or "falla" in texto:
-        return AGENTE_ORION_ID  # 55
-    elif "ventas" in texto or "cotización" in texto or "precio" in texto:
-        return AGENTE_AGATA_ID  # 53
-    else:
-        return AGENTE_LUCIA_ID  # 54 (por defecto)
-
-def procesar_correos():
-    """Lee correos no leídos y crea tareas"""
-    mail = conectar_imap()
+    if not email_password:
+        print(f"⚠️ Sin contraseña para {email_user}, omitiendo...")
+        return
+    
+    mail = conectar_imap(email_user, email_password, imap_server)
     if not mail:
         return
     
     try:
+        print(f"🔍 Buscando correos no leídos en {email_user}...")
         result, data = mail.search(None, 'UNSEEN')
         email_ids = data[0].split()
         
         if not email_ids:
-            print("📭 No hay correos nuevos")
+            print(f"📭 No hay correos nuevos en {email_user}")
             mail.close()
             mail.logout()
             return
         
-        print(f"📧 {len(email_ids)} correos nuevos")
+        print(f"📧 {len(email_ids)} correos nuevos en {email_user} para {nombre_agente}")
         
         for email_id in email_ids:
             try:
+                print(f"📥 Procesando correo ID: {email_id} de {email_user}")
                 result, msg_data = mail.fetch(email_id, '(RFC822)')
                 msg = email.message_from_bytes(msg_data[0][1])
                 
@@ -137,23 +170,31 @@ def procesar_correos():
                 else:
                     cuerpo = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
                 
-                print(f"📥 De: {remitente} | Asunto: {asunto[:50]}")
-                
-                agente_id = detectar_agente_por_correo(asunto, cuerpo)
+                print(f"📧 De: {remitente} | Asunto: {asunto[:50]}")
                 
                 if crear_tarea_en_crm(remitente, asunto, cuerpo, agente_id):
                     mail.store(email_id, '+FLAGS', '\\Seen')
-                    print(f"✅ Correo procesado y marcado como leído")
+                    print(f"✅ Correo de {email_user} procesado y marcado como leído")
+                else:
+                    print(f"⚠️ No se pudo crear la tarea para el correo de {email_user}")
                 
             except Exception as e:
-                print(f"❌ Error procesando correo: {e}")
+                print(f"❌ Error procesando correo ID {email_id} de {email_user}: {e}")
                 continue
         
         mail.close()
         mail.logout()
+        print(f"📬 Procesamiento de {email_user} completado")
         
     except Exception as e:
-        print(f"❌ Error general: {e}")
+        print(f"❌ Error general en procesar_correos_cuenta para {email_user}: {e}")
+
+def procesar_todos_los_correos():
+    """Procesa correos de todas las cuentas configuradas"""
+    print("📬 Iniciando procesamiento de todas las cuentas de correo...")
+    for cuenta in CUENTAS_CORREO:
+        procesar_correos_cuenta(cuenta)
+    print("📬 Procesamiento de todas las cuentas completado")
 
 # ============================================================
 # HEARTBEAT AL CRM
@@ -182,10 +223,10 @@ def enviar_heartbeat():
         time.sleep(30)
 
 def revisar_correos_periodicamente():
-    """Revisa correos cada 30 segundos"""
+    """Revisa correos de todas las cuentas cada 30 segundos"""
     while True:
         try:
-            procesar_correos()
+            procesar_todos_los_correos()
         except Exception as e:
             print(f"❌ Error en lector de correos: {e}")
         time.sleep(30)
@@ -217,8 +258,16 @@ def health():
 @app.route('/test-correo')
 def test_correo():
     """Endpoint para probar la lectura de correos manualmente"""
-    procesar_correos()
-    return jsonify({"status": "Correos procesados", "timestamp": datetime.now().isoformat()})
+    print("=" * 50)
+    print("🧪 TEST-CORREO EJECUTADO MANUALMENTE")
+    print("=" * 50)
+    procesar_todos_los_correos()
+    print("=" * 50)
+    return jsonify({
+        "status": "Correos procesados", 
+        "timestamp": datetime.now().isoformat(),
+        "cuentas": [c['email'] for c in CUENTAS_CORREO]
+    })
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -246,12 +295,15 @@ def chat():
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("🛰️ CORELLA SATEC - Asistente IA con Lector de Correos")
+    print("🛰️ CORELLA SATEC - Asistente IA con Lector de Múltiples Correos")
     print("=" * 60)
     for key, data in PERFILES.items():
         print(f"   {data['emoji']} {data['nombre']} ({data['rol']})")
     print("=" * 60)
-    print(f"📧 Correo: {EMAIL_USER}")
+    print("📧 CUENTAS DE CORREO:")
+    for cuenta in CUENTAS_CORREO:
+        print(f"   - {cuenta['email']} → {cuenta['nombre_agente']} (ID: {cuenta['agente_id']})")
+    print("=" * 60)
     print(f"🌐 Puerto: {PORT}")
     print("=" * 60)
     print("💓 Heartbeat iniciado (cada 30 segundos)")
