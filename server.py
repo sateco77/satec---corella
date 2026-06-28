@@ -1,10 +1,10 @@
-# server.py
+# server.py - CON DEPURACIÓN
 import os
 import imaplib
 import smtplib
 import email
 from email.mime.text import MIMEText
-import requests  # Reemplaza a ollama y al SDK de google para evitar errores de Python 3.14
+import requests
 import time
 import ssl
 import logging
@@ -35,6 +35,17 @@ IMAP_SERVER = os.getenv('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
+# ============================================================
+# DEPURACIÓN: MOSTRAR CREDENCIALES
+# ============================================================
+print("\n🔍 DIAGNÓSTICO DE CREDENCIALES:")
+print(f"📧 EMAIL_CONTACTO: {EMAIL_CONTACTO}")
+print(f"🔑 PASS_CONTACTO: {'✅ CONFIGURADA' if PASS_CONTACTO else '❌ VACÍA'}")
+print(f"📧 EMAIL_VENTAS: {EMAIL_VENTAS}")
+print(f"🔑 PASS_VENTAS: {'✅ CONFIGURADA' if PASS_VENTAS else '❌ VACÍA'}")
+print(f"🤖 GEMINI_API_KEY: {'✅ CONFIGURADA' if GEMINI_API_KEY else '❌ VACÍA'}")
+print("=" * 60)
 
 # ============================================================
 # PERFILES Y PROMPTS
@@ -84,7 +95,7 @@ Teléfono: 938 120 6643.
 # MOSTRAR CONFIGURACIÓN
 # ============================================================
 print("=" * 60)
-print("🚀 CORELLA MULTI - Asistente de Correo (Gemini Cloud)")
+print("🚀 CORELLA WORKER - Asistente de Correo (Gemini)")
 print("=" * 60)
 print(f"📧 Orion 🔧: {EMAIL_CONTACTO}")
 print(f"📧 Lucía 💬: {EMAIL_VENTAS}")
@@ -122,11 +133,10 @@ def test_smtp(email, password):
         return False
 
 def responder_con_gemini_directo(prompt_sistema, mensaje):
-    """Genera respuesta usando una petición HTTP directa a la API de Gemini"""
     if not GEMINI_API_KEY:
-        logger.error("❌ GEMINI_API_KEY no configurada en las variables de entorno.")
-        return "Lo siento, el servicio de IA no está disponible en este momento. Contacta al 938 120 6643."
-        
+        logger.error("❌ GEMINI_API_KEY no configurada")
+        return "Lo siento, el servicio de IA no está disponible. Contacta al 938 120 6643."
+    
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         headers = {'Content-Type': 'application/json'}
@@ -141,11 +151,10 @@ def responder_con_gemini_directo(prompt_sistema, mensaje):
         response = requests.post(url, json=payload, headers=headers)
         response_json = response.json()
         
-        # Extraemos el contenido generado por la IA
         respuesta_texto = response_json['candidates'][0]['content']['parts'][0]['text']
         return respuesta_texto
     except Exception as e:
-        logger.error(f"❌ Error en llamada directa a Gemini: {e}")
+        logger.error(f"❌ Error en Gemini: {e}")
         return "Lo siento, estoy teniendo problemas técnicos. Contacta al 938 120 6643."
 
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
@@ -216,7 +225,7 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil):
             else:
                 prompt = PROMPT_LUCIA
             
-            logger.info("🤖 Generando respuesta con Gemini Cloud...")
+            logger.info("🤖 Generando respuesta con Gemini...")
             respuesta = responder_con_gemini_directo(prompt, cuerpo)
             logger.info(f"💬 Respuesta generada: {respuesta[:100]}...")
             
@@ -253,7 +262,9 @@ if __name__ == '__main__':
         else:
             print("❌ Orion - Falló conexión")
             todas_ok = False
-            
+    else:
+        print("⚠️ Orion - Sin credenciales")
+    
     print(f"\n📧 Probando Lucía (ventas@satecnetwork.com)...")
     if EMAIL_VENTAS and PASS_VENTAS:
         if test_imap(EMAIL_VENTAS, PASS_VENTAS) and test_smtp(EMAIL_VENTAS, PASS_VENTAS):
@@ -261,17 +272,23 @@ if __name__ == '__main__':
         else:
             print("❌ Lucía - Falló conexión")
             todas_ok = False
+    else:
+        print("⚠️ Lucía - Sin credenciales")
     
     if todas_ok:
         print("\n✅ Conexiones exitosas. Iniciando monitoreo...")
+        print("⏱️  Revisando cada 30 segundos. Presiona Ctrl+C para detener.\n")
+        
+        # Ejecutar una vez al inicio
         procesar_todos_los_correos()
         
+        # Bucle infinito
         while True:
             try:
                 time.sleep(30)
                 procesar_todos_los_correos()
             except KeyboardInterrupt:
-                print("\n🛑 Corella Multi detenido")
+                print("\n🛑 Corella Worker detenido")
                 break
             except Exception as e:
                 logger.error(f"❌ Error inesperado: {e}")
