@@ -29,27 +29,34 @@ IMAP_SERVER = 'imap.hostinger.com'
 API_URL = "https://satecnetwork.com/crm/api_crm.php/tarea_agente"
            
 
+# 1. La URL base vuelve a ser limpia, usando tu dominio real
+API_URL = "https://satecnetwork.com/crm/api_crm.php"
+
 def crear_tarea_en_hostinger(remitente, asunto):
     try:
-        # Enviamos 'action' como parámetro URL (?action=tarea_agente)
-        params = {'action': 'tarea_agente'}
+        # Tu CRM real busca la ruta en la variable 'path' de la URL
+        # Probamos pasándole '/tarea_agente' (con la barra) para que el enrutador de tu CRM lo valide correctamente
+        params = {'path': '/tarea_agente'} 
         
         payload = {
             'texto': f"Correo de {remitente}: {asunto[:50]}",
             'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
-            'asignada_a': 54, # ID Fijo de Lucía para la prueba
+            'asignada_a': 54, 
             'asignada_por': 1,
             'fuente': 'correo'
         }
         
-        logger.info(f"📤 Enviando POST a: {API_URL} con params {params}")
+        logger.info(f"📤 Enviando POST al API Real con params {params}")
         
         response = requests.post(
             API_URL,
-            params=params,
-            json=payload,
+            params=params,  # Esto mete el ?path=/tarea_agente en la URL automáticamente
+            json=payload,   # Esto mete el cuerpo JSON que procesa tu API
             timeout=15,
-            headers={'Content-Type': 'application/json', 'Accept': 'application/json'}
+            headers={
+                'Content-Type': 'application/json', 
+                'Accept': 'application/json'
+            }
         )
         
         logger.info(f"📡 Estado HTTP: {response.status_code}")
