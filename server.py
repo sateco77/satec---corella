@@ -66,6 +66,32 @@ def revisar_correos_prueba():
         logger.error(f"❌ Error IMAP: {e}")
 
 @app.route('/test-correo')
+
+def enviar_heartbeat():
+    crm_url = "https://satecnetwork.com/crm/api_crm.php"
+    while True:
+        try:
+            response = requests.post(
+                f"{crm_url}?path=agente_heartbeat",
+                json={
+                    'agente_id': 'corella_server',
+                    'perfiles': list(PERFILES.keys()),
+                    'estado': 'online',
+                    'timestamp': datetime.now().isoformat()
+                },
+                timeout=10
+            )
+            if response.status_code == 200:
+                print("💓 Heartbeat enviado")
+            else:
+                print(f"⚠️ Heartbeat: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Heartbeat falló: {e}")
+        time.sleep(30)
+
+threading.Thread(target=enviar_heartbeat, daemon=True).start()
+
+
 def test_correo():
     revisar_correos_prueba()
     return jsonify({"status": "Prueba ejecutada, revisa los logs"})
