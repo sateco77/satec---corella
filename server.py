@@ -85,7 +85,7 @@ def crear_tarea_en_crm(remitente, asunto, cuerpo, agente_id=54):
             print(f"✅ Tarea creada para agente ID {agente_id}")
             return True
         else:
-            print(f"⚠️ Error creando tarea: {response.status_code} - {response.text}")
+            print(f"⚠️ Error creando tarea: {response.status_code}")
             return False
     except Exception as e:
         print(f"❌ Error API: {e}")
@@ -96,11 +96,11 @@ def detectar_agente_por_correo(asunto, cuerpo):
     texto = (asunto + " " + cuerpo).lower()
     
     if "soporte" in texto or "problema" in texto or "falla" in texto:
-        return AGENTE_ORION_ID  # 55 (Orion)
+        return AGENTE_ORION_ID  # 55
     elif "ventas" in texto or "cotización" in texto or "precio" in texto:
-        return AGENTE_AGATA_ID  # 53 (Ágata)
+        return AGENTE_AGATA_ID  # 53
     else:
-        return AGENTE_LUCIA_ID  # 54 (Lucía)
+        return AGENTE_LUCIA_ID  # 54 (por defecto)
 
 def procesar_correos():
     """Lee correos no leídos y crea tareas"""
@@ -140,7 +140,6 @@ def procesar_correos():
                 print(f"📥 De: {remitente} | Asunto: {asunto[:50]}")
                 
                 agente_id = detectar_agente_por_correo(asunto, cuerpo)
-                print(f"🔍 Agente asignado: ID {agente_id}")
                 
                 if crear_tarea_en_crm(remitente, asunto, cuerpo, agente_id):
                     mail.store(email_id, '+FLAGS', '\\Seen')
