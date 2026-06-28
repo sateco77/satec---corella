@@ -4,11 +4,11 @@ import imaplib
 import smtplib
 import email
 from email.mime.text import MIMEText
+import requests  # Reemplaza a ollama y al SDK de google para evitar errores de Python 3.14
 import time
 import ssl
 import logging
 from dotenv import load_dotenv
-import google.generativeai as genai
 
 # Cargar .env
 load_dotenv()
@@ -22,29 +22,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# CONFIGURACIÓN DE CORREOS (desde .env)
+# CONFIGURACIÓN DE CORREOS (desde .env / Render Environment)
 # ============================================================
 
-# Correo CONTACTO (Orion - Soporte)
 EMAIL_CONTACTO = os.getenv('EMAIL_USER_CONTACTO') or os.getenv('EMAIL_USER')
 PASS_CONTACTO = os.getenv('EMAIL_PASS_CONTACTO') or os.getenv('EMAIL_PASS')
 
-# Correo VENTAS (Lucía - Ventas)
 EMAIL_VENTAS = os.getenv('EMAIL_USER_VENTAS')
 PASS_VENTAS = os.getenv('EMAIL_PASS_VENTAS')
 
-# Configuración IMAP/SMTP
 IMAP_SERVER = os.getenv('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
 
-# Gemini API
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-    logger.info("✅ Gemini API configurada correctamente")
-else:
-    logger.warning("⚠️ GEMINI_API_KEY no configurada")
 
 # ============================================================
 # PERFILES Y PROMPTS
@@ -94,7 +84,7 @@ Teléfono: 938 120 6643.
 # MOSTRAR CONFIGURACIÓN
 # ============================================================
 print("=" * 60)
-print("🚀 CORELLA MULTI - Asistente de Correo (Gemini)")
+print("🚀 CORELLA MULTI - Asistente de Correo (Gemini Cloud)")
 print("=" * 60)
 print(f"📧 Orion 🔧: {EMAIL_CONTACTO}")
 print(f"📧 Lucía 💬: {EMAIL_VENTAS}")
@@ -108,7 +98,6 @@ print("=" * 60)
 # ============================================================
 
 def test_imap(email, password):
-    """Prueba conexión IMAP para una cuenta"""
     try:
         context = ssl.create_default_context()
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, 993, ssl_context=context)
@@ -122,7 +111,6 @@ def test_imap(email, password):
         return False
 
 def test_smtp(email, password):
-    """Prueba conexión SMTP para una cuenta"""
     try:
         server = smtplib.SMTP(SMTP_SERVER, 587)
         server.starttls()
@@ -133,22 +121,34 @@ def test_smtp(email, password):
         logger.error(f"❌ SMTP Error para {email}: {e}")
         return False
 
-def responder_con_gemini(prompt_sistema, mensaje):
-    """Genera respuesta usando Gemini API"""
+def responder_con_gemini_directo(prompt_sistema, mensaje):
+    """Genera respuesta usando una petición HTTP directa a la API de Gemini"""
     if not GEMINI_API_KEY:
-        logger.error("❌ GEMINI_API_KEY no configurada")
-        return "Lo siento, el servicio de IA no está disponible. Contacta al 938 120 6643."
-    
+        logger.error("❌ GEMINI_API_KEY no configurada en las variables de entorno.")
+        return "Lo siento, el servicio de IA no está disponible en este momento. Contacta al 938 120 6643."
+        
     try:
-        full_prompt = f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
-        response = gemini_model.generate_content(full_prompt)
-        return response.text
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        headers = {'Content-Type': 'application/json'}
+        payload = {
+            "contents": [{
+                "parts": [{
+                    "text": f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
+                }]
+            }]
+        }
+        
+        response = requests.post(url, json=payload, headers=headers)
+        response_json = response.json()
+        
+        # Extraemos el contenido generado por la IA
+        respuesta_texto = response_json['candidates'][0]['content']['parts'][0]['text']
+        return respuesta_texto
     except Exception as e:
-        logger.error(f"❌ Error en Gemini: {e}")
+        logger.error(f"❌ Error en llamada directa a Gemini: {e}")
         return "Lo siento, estoy teniendo problemas técnicos. Contacta al 938 120 6643."
 
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
-    """Envía respuesta por correo"""
     try:
         msg = MIMEText(respuesta, 'plain', 'utf-8')
         msg['Subject'] = f"Re: {asunto}"
@@ -167,7 +167,6 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         return False
 
 def leer_y_responder_cuenta(cuenta_correo, password, perfil):
-    """Lee correos de una cuenta específica y responde con IA"""
     if not cuenta_correo or not password:
         logger.warning(f"⚠️ Credenciales incompletas para {perfil}")
         return
@@ -212,21 +211,17 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil):
             logger.info(f"📧 Asunto: {asunto}")
             logger.info(f"📝 Cuerpo: {cuerpo[:100]}...")
             
-            # Elegir prompt según el perfil
             if perfil == "Orion":
                 prompt = PROMPT_ORION
             else:
                 prompt = PROMPT_LUCIA
             
-            # Generar respuesta con Gemini
-            logger.info("🤖 Generando respuesta con Gemini...")
-            respuesta = responder_con_gemini(prompt, cuerpo)
+            logger.info("🤖 Generando respuesta con Gemini Cloud...")
+            respuesta = responder_con_gemini_directo(prompt, cuerpo)
             logger.info(f"💬 Respuesta generada: {respuesta[:100]}...")
             
-            # Enviar respuesta
             enviar_respuesta(remitente, asunto, respuesta, cuenta_correo, password)
             
-            # Marcar como leído
             mail.store(email_id, '+FLAGS', '\\Seen')
             logger.info(f"✅ Respondido y marcado como leído")
         
@@ -237,15 +232,11 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil):
         logger.error(f"❌ Error en {perfil}: {e}")
 
 def procesar_todos_los_correos():
-    """Procesa correos de todas las cuentas configuradas"""
     logger.info("📬 Procesando todas las cuentas...")
-    
     if EMAIL_CONTACTO and PASS_CONTACTO:
         leer_y_responder_cuenta(EMAIL_CONTACTO, PASS_CONTACTO, "Orion")
-    
     if EMAIL_VENTAS and PASS_VENTAS:
         leer_y_responder_cuenta(EMAIL_VENTAS, PASS_VENTAS, "Lucía")
-    
     logger.info("📬 Procesamiento completado")
 
 # ============================================================
@@ -253,7 +244,6 @@ def procesar_todos_los_correos():
 # ============================================================
 if __name__ == '__main__':
     print("\n🔍 Verificando conexiones...")
-    
     todas_ok = True
     
     print(f"\n📧 Probando Orion (contacto@satecnetwork.com)...")
@@ -263,9 +253,7 @@ if __name__ == '__main__':
         else:
             print("❌ Orion - Falló conexión")
             todas_ok = False
-    else:
-        print("⚠️ Orion - Sin credenciales")
-    
+            
     print(f"\n📧 Probando Lucía (ventas@satecnetwork.com)...")
     if EMAIL_VENTAS and PASS_VENTAS:
         if test_imap(EMAIL_VENTAS, PASS_VENTAS) and test_smtp(EMAIL_VENTAS, PASS_VENTAS):
@@ -273,13 +261,9 @@ if __name__ == '__main__':
         else:
             print("❌ Lucía - Falló conexión")
             todas_ok = False
-    else:
-        print("⚠️ Lucía - Sin credenciales")
     
-    if todas_ok and GEMINI_API_KEY:
+    if todas_ok:
         print("\n✅ Conexiones exitosas. Iniciando monitoreo...")
-        print("⏱️  Revisando cada 30 segundos. Presiona Ctrl+C para detener.\n")
-        
         procesar_todos_los_correos()
         
         while True:
@@ -294,5 +278,3 @@ if __name__ == '__main__':
                 time.sleep(10)
     else:
         print("\n⚠️ No se iniciará el monitoreo por fallas en conexiones.")
-        if not GEMINI_API_KEY:
-            print("   ❌ GEMINI_API_KEY no configurada")
