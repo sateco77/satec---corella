@@ -1,16 +1,16 @@
-# corella_multi.py
+# server.py
 import os
 import imaplib
 import smtplib
 import email
 from email.mime.text import MIMEText
-import ollama
+import requests  # Cambiado Ollama por llamadas HTTP directas a Gemini
 import time
 import ssl
 import logging
 from dotenv import load_dotenv
 
-# Cargar .env
+# Cargar .env (Solo afectará en local)
 load_dotenv()
 
 # Configurar logging
@@ -22,24 +22,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# CONFIGURACIÓN DE CORREOS (desde .env)
+# CONFIGURACIÓN DE CORREOS Y LLAVES (desde Render Environment)
 # ============================================================
 
-# Correo CONTACTO (Orion - Soporte)
 EMAIL_CONTACTO = os.getenv('EMAIL_USER_CONTACTO') or os.getenv('EMAIL_USER')
 PASS_CONTACTO = os.getenv('EMAIL_PASS_CONTACTO') or os.getenv('EMAIL_PASS')
 
-# Correo VENTAS (Lucía - Ventas)
 EMAIL_VENTAS = os.getenv('EMAIL_USER_VENTAS')
 PASS_VENTAS = os.getenv('EMAIL_PASS_VENTAS')
 
-# Configuración IMAP/SMTP
 IMAP_SERVER = os.getenv('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
 
-# Ollama
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2:latest')
-OLLAMA_TEMPERATURE = float(os.getenv('OLLAMA_TEMPERATURE', 0.3))
+# Configuración de la IA en la Nube (Gemini API)
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # ============================================================
 # PERFILES Y PROMPTS
@@ -85,17 +81,14 @@ Si es un problema técnico, deriva a soporte@satecnetwork.com.
 Teléfono: 938 120 6643.
 """
 
-# ============================================================
-# MOSTRAR CONFIGURACIÓN
-# ============================================================
 print("=" * 60)
-print("🚀 CORELLA MULTI - Asistente de Correo (2 perfiles)")
+print("🚀 CORELLA MULTI CLOUD - Asistente en la Nube")
 print("=" * 60)
 print(f"📧 Orion 🔧: {EMAIL_CONTACTO}")
 print(f"📧 Lucía 💬: {EMAIL_VENTAS}")
 print(f"📡 IMAP: {IMAP_SERVER}")
 print(f"📡 SMTP: {SMTP_SERVER}")
-print(f"🤖 Modelo: {OLLAMA_MODEL}")
+print(f"🤖 Motor de IA: Gemini Cloud API")
 print("=" * 60)
 
 # ============================================================
@@ -103,7 +96,6 @@ print("=" * 60)
 # ============================================================
 
 def test_imap(email, password):
-    """Prueba conexión IMAP para una cuenta"""
     try:
         context = ssl.create_default_context()
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, 993, ssl_context=context)
@@ -117,7 +109,6 @@ def test_imap(email, password):
         return False
 
 def test_smtp(email, password):
-    """Prueba conexión SMTP para una cuenta"""
     try:
         server = smtplib.SMTP(SMTP_SERVER, 587)
         server.starttls()
@@ -128,22 +119,37 @@ def test_smtp(email, password):
         logger.error(f"❌ SMTP Error para {email}: {e}")
         return False
 
-def responder_con_ollama(prompt_sistema, mensaje):
-    """Genera respuesta usando Ollama"""
+def responder_con_ia_cloud(prompt_sistema, mensaje):
+    """Genera respuesta usando la API de Gemini (reemplaza a Ollama)"""
+    if not GEMINI_API_KEY:
+        logger.error("❌ Falta la variable GEMINI_API_KEY en el entorno.")
+        return "Lo siento, estoy teniendo problemas de configuración técnica. Contacta al 938 120 6643."
+        
     try:
-        full_prompt = f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
-        response = ollama.generate(
-            model=OLLAMA_MODEL,
-            prompt=full_prompt,
-            options={'temperature': OLLAMA_TEMPERATURE}
-        )
-        return response['response']
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        headers = {'Content-Type': 'application/json'}
+        
+        # Estructura requerida por la API de Google
+        payload = {
+            "contents": [{
+                "parts": [{
+                    "text": f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
+                }]
+            }]
+        }
+        
+        response = requests.post(url, json=payload, headers=headers)
+        response_json = response.json()
+        
+        # Extraer el texto de la respuesta
+        texto_respuesta = response_json['candidates'][0]['content']['parts'][0]['text']
+        return texto_respuesta
+        
     except Exception as e:
-        logger.error(f"❌ Error en Ollama: {e}")
-        return "Lo siento, estoy teniendo problemas técnicos. Contacta al 938 120 6643."
+        logger.error(f"❌ Error en Gemini API: {e}")
+        return "Lo siento, estoy teniendo problemas técnicos en la nube. Contacta al 938 120 6643."
 
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
-    """Envía respuesta por correo"""
     try:
         msg = MIMEText(respuesta, 'plain', 'utf-8')
         msg['Subject'] = f"Re: {asunto}"
@@ -162,7 +168,6 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         return False
 
 def leer_y_responder_cuenta(cuenta_correo, password, perfil):
-    """Lee correos de una cuenta específica y responde con IA"""
     if not cuenta_correo or not password:
         logger.warning(f"⚠️ Credenciales incompletas para {perfil}")
         return
@@ -189,7 +194,6 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil):
             logger.info(f"📥 Procesando correo ID: {email_id}")
             result, msg_data = mail.fetch(email_id, '(RFC822)')
             
-            # Usar el módulo email correctamente
             msg = email.message_from_bytes(msg_data[0][1])
             
             remitente = msg['From']
@@ -208,21 +212,17 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil):
             logger.info(f"📧 Asunto: {asunto}")
             logger.info(f"📝 Cuerpo: {cuerpo[:100]}...")
             
-            # Elegir prompt según el perfil
             if perfil == "Orion":
                 prompt = PROMPT_ORION
             else:
                 prompt = PROMPT_LUCIA
             
-            # Generar respuesta con IA
-            logger.info("🤖 Generando respuesta con Ollama...")
-            respuesta = responder_con_ollama(prompt, cuerpo)
+            logger.info("🤖 Generando respuesta con Gemini Cloud...")
+            respuesta = responder_con_ia_cloud(prompt, cuerpo)
             logger.info(f"💬 Respuesta generada: {respuesta[:100]}...")
             
-            # Enviar respuesta
             enviar_respuesta(remitente, asunto, respuesta, cuenta_correo, password)
             
-            # Marcar como leído
             mail.store(email_id, '+FLAGS', '\\Seen')
             logger.info(f"✅ Respondido y marcado como leído")
         
@@ -233,17 +233,11 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil):
         logger.error(f"❌ Error en {perfil}: {e}")
 
 def procesar_todos_los_correos():
-    """Procesa correos de todas las cuentas configuradas"""
     logger.info("📬 Procesando todas las cuentas...")
-    
-    # Procesar Orion (contacto)
     if EMAIL_CONTACTO and PASS_CONTACTO:
         leer_y_responder_cuenta(EMAIL_CONTACTO, PASS_CONTACTO, "Orion")
-    
-    # Procesar Lucía (ventas)
     if EMAIL_VENTAS and PASS_VENTAS:
         leer_y_responder_cuenta(EMAIL_VENTAS, PASS_VENTAS, "Lucía")
-    
     logger.info("📬 Procesamiento completado")
 
 # ============================================================
@@ -251,8 +245,6 @@ def procesar_todos_los_correos():
 # ============================================================
 if __name__ == '__main__':
     print("\n🔍 Verificando conexiones...")
-    
-    # Probar conexiones
     todas_ok = True
     
     print(f"\n📧 Probando Orion (contacto@satecnetwork.com)...")
@@ -262,9 +254,7 @@ if __name__ == '__main__':
         else:
             print("❌ Orion - Falló conexión")
             todas_ok = False
-    else:
-        print("⚠️ Orion - Sin credenciales")
-    
+            
     print(f"\n📧 Probando Lucía (ventas@satecnetwork.com)...")
     if EMAIL_VENTAS and PASS_VENTAS:
         if test_imap(EMAIL_VENTAS, PASS_VENTAS) and test_smtp(EMAIL_VENTAS, PASS_VENTAS):
@@ -272,14 +262,9 @@ if __name__ == '__main__':
         else:
             print("❌ Lucía - Falló conexión")
             todas_ok = False
-    else:
-        print("⚠️ Lucía - Sin credenciales")
     
     if todas_ok:
         print("\n✅ Conexiones exitosas. Iniciando monitoreo...")
-        print("⏱️  Revisando cada 30 segundos. Presiona Ctrl+C para detener.\n")
-        
-        # Ejecutar una vez al inicio
         procesar_todos_los_correos()
         
         while True:
