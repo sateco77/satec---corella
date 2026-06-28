@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-import time
 import logging
 import requests
 import imaplib
@@ -11,34 +10,19 @@ import ssl
 from datetime import datetime
 from flask import Flask, jsonify
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# CONFIGURACIÓN CRUCIAL (Revisa que coincida con tus credenciales de Hostinger)
 EMAIL_VENTAS = os.environ.get('EMAIL_VENTAS', 'ventas@satecnetwork.com')
 EMAIL_VENTAS_PASSWORD = os.environ.get('PASSWORD_VENTAS', '')
 IMAP_SERVER = 'imap.hostinger.com'
-
-# URL Limpia sin barras diagonales al final
-API_URL = "https://satecnetwork.com/crm/api_crm.php/tarea_agente"
-           
-
-# 1. La URL base vuelve a ser limpia, usando tu dominio real
 API_URL = "https://satecnetwork.com/crm/api_crm.php"
 
 def crear_tarea_en_hostinger(remitente, asunto):
     try:
-        # Tu CRM real busca la ruta en la variable 'path' de la URL
-        # Probamos pasándole '/tarea_agente' (con la barra) para que el enrutador de tu CRM lo valide correctamente
-        
         params = {'path': 'tarea_agente'}
-        
         payload = {
             'texto': f"Correo de {remitente}: {asunto[:50]}",
             'fecha_limite': datetime.now().strftime('%Y-%m-%d'),
@@ -47,70 +31,48 @@ def crear_tarea_en_hostinger(remitente, asunto):
             'fuente': 'correo'
         }
         
-        logger.info(f"📤 Enviando POST al API Real con params {params}")
-        
-        response = requests.post(
-            API_URL,
-            params=params,  # Esto mete el ?path=/tarea_agente en la URL automáticamente
-            json=payload,   # Esto mete el cuerpo JSON que procesa tu API
-            timeout=15,
-            headers={
-                'Content-Type': 'application/json', 
-                'Accept': 'application/json'
-            }
-        )
-        
-        logger.info(f"📡 Estado HTTP: {response.status_code}")
-        logger.info(f"📡 Respuesta del Servidor: {response.text}")
+        logger.info(f"📤 Enviando POST con params {params}")
+        response = requests.post(API_URL, params=params, json=payload, timeout=15)
+        logger.info(f"📡 Estado HTTP: {response.status_code} | Respuesta: {response.text}")
         return True
     except Exception as e:
-        logger.error(f"❌ Error en la petición: {e}")
+        logger.error(f"❌ Error API: {e}")
         return False
 
 def revisar_correos_prueba():
     if not EMAIL_VENTAS_PASSWORD:
-        logger.warning("⚠️ No hay contraseña configurada para el correo.")
+        logger.warning("⚠️ Sin PASSWORD_VENTAS configurado.")
         return
         
     try:
-        logger.info(f"📡 Conectando a {EMAIL_VENTAS}...")
-        context = ssl.create_default_context()
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER, 993, ssl_context=context)
+        logger.info("📡 Conectando a IMAP...")
+        mail = imaplib.IMAP4_SSL(IMAP_SERVER, 993, ssl_context=ssl.create_default_context())
         mail.login(EMAIL_VENTAS, EMAIL_VENTAS_PASSWORD)
         mail.select('INBOX')
         
-        # Buscamos el último correo de la bandeja
-        result, data = mail.search(None, 'ALL')
+        _, data = mail.search(None, 'ALL')
         ids = data[0].split()
         
-        if len(ids) > 0:
-            ultimo_id = ids[-1]
-            res, msg_data = mail.fetch(ultimo_id, '(RFC822)')
+        if ids:
+            _, msg_data = mail.fetch(ids[-1], '(RFC822)')
             msg = email.message_from_bytes(msg_data[0][1])
-            
-            remitente = msg.get('From', 'Desconocido')
-            asunto = msg.get('Subject', 'Sin Asunto')
-            
-            logger.info(f"📧 Último correo detectado -> De: {remitente} | Asunto: {asunto}")
-            crear_tarea_en_hostinger(remitente, asunto)
+            crear_tarea_en_hostinger(msg.get('From', 'Desconocido'), msg.get('Subject', 'Sin Asunto'))
         else:
-            logger.info("📭 No se encontraron correos en la bandeja.")
+            logger.info("📭 Bandeja vacía.")
             
         mail.close()
         mail.logout()
     except Exception as e:
-        logger.error(f"❌ Error leyendo buzón: {e}")
+        logger.error(f"❌ Error IMAP: {e}")
 
-# Endpoint simple para gatillar la prueba manualmente desde el navegador/Render
 @app.route('/test-correo')
 def test_correo():
     revisar_correos_prueba()
-    return jsonify({"status": "Prueba ejecutada, revisa los logs de Render"})
+    return jsonify({"status": "Prueba ejecutada, revisa los logs"})
 
 @app.route('/')
 def health():
     return jsonify({"status": "Bot Minimo Corriendo"})
 
 if __name__ == '__main__':
-    PORT = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=PORT)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
