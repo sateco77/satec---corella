@@ -26,7 +26,7 @@ EMAIL_VENTAS_PASSWORD = os.environ.get('PASSWORD_VENTAS', '')
 IMAP_SERVER = 'imap.hostinger.com'
 
 # URL Limpia sin barras diagonales al final
-API_URL = "https://satecnetwork.com/crm/api_crm.php"
+API_URL = "https://satecnetwork.com/crm/api_crm.php/tarea_agente
 
 def crear_tarea_en_hostinger(remitente, asunto):
     try:
