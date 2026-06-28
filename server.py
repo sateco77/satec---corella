@@ -36,7 +36,8 @@ def crear_tarea_en_hostinger(remitente, asunto):
     try:
         # Tu CRM real busca la ruta en la variable 'path' de la URL
         # Probamos pasándole '/tarea_agente' (con la barra) para que el enrutador de tu CRM lo valide correctamente
-        params = {'path': '/tarea_agente'} 
+        
+        params = {'path': 'tarea_agente'}
         
         payload = {
             'texto': f"Correo de {remitente}: {asunto[:50]}",
