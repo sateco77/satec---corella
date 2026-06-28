@@ -1,4 +1,4 @@
-# corella_multi.py
+# server.py
 import os
 import imaplib
 import smtplib
