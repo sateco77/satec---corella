@@ -1,9 +1,6 @@
 services:
-  - type: web
-    name: render
+  - type: worker
+    name: corella-multi
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python server.py
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.8
