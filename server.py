@@ -66,7 +66,7 @@ SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('models/gemini-2.0-flash-exp')
+    gemini_model = genai.GenerativeModel('models/gemini-2.0-flash')
     logger.info("✅ Gemini API configurada correctamente")
 else:
     gemini_model = None
