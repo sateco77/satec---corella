@@ -126,13 +126,13 @@ def responder_con_gemini(prompt_sistema, mensaje):
     
     try:
         full_prompt = f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
-        response = model.generate_content(full_prompt)
+        # USAMOS EL NOMBRE CORRECTO: gemini_model
+        response = gemini_model.generate_content(full_prompt)
         return response.text
     except Exception as e:
         logger.error(f"❌ Error en Gemini: {e}")
-        # Retornamos un texto por defecto para que el flujo de correo NO se detenga aunque falle la IA
         return "Hola, gracias por escribirnos. Recibimos tu solicitud sobre sistemas de seguridad y un asesor humano te atenderá a la brevedad. Puedes marcarnos al 938 120 6643."
-
+        
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
     try:
         msg = MIMEText(respuesta, 'plain', 'utf-8')
