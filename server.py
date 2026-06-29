@@ -140,16 +140,17 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         msg['From'] = email_from
         msg['To'] = para
         
-        logger.info(f"Connecting to SMTP {SMTP_SERVER} on port 587...")
-        # Usamos un timeout explícito para evitar que se quede colgado si la red falla
-        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
-        server.ehlo() 
-        server.starttls()
-        server.ehlo()
+        # Forzamos los parámetros correctos para Hostinger (Puerto 465 con SSL)
+        puerto_seguro = 465
+        logger.info(f"Connecting to SMTP {SMTP_SERVER} on port {puerto_seguro} (SSL)...")
+        
+        # Cambiamos a la conexión directa por SSL que no se cuelga
+        server = smtplib.SMTP_SSL(SMTP_SERVER, puerto_seguro, timeout=15)
         server.login(email_from, password)
         server.send_message(msg)
         server.quit()
-        logger.info(f"✅ Respuesta enviada a {para} desde {email_from}")
+        
+        logger.info(f"✅ Respuesta enviada exitosamente a {para} desde {email_from}")
         return True
     except Exception as e:
         logger.error(f"❌ Error SMTP desde {email_from}: {e}")
