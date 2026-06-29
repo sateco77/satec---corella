@@ -1,4 +1,4 @@
-# server.py - SIN EMOJIS (COMPATIBLE CON RENDER)
+# server.py - CON ESTRATEGIA DEL ÁNGEL GUARDIAN
 import os
 import imaplib
 import smtplib
@@ -24,32 +24,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# ESCUDO DE PROTECCION PARA RENDER
+# ESCUDO DE PROTECCIÓN PARA RENDER (ESTRATEGIA ÁNGEL GUARDIAN)
 # ============================================================
 class RenderHealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        """Responde a las verificaciones de Render"""
         self.send_response(200)
         self.send_header("Content-type", "text/plain; charset=utf-8")
         self.end_headers()
         self.wfile.write(b"Corella Multi - Agente de Correo activo\n")
     
     def log_message(self, format, *args):
+        """Silencia logs de HTTP para no saturar"""
         return
 
 def levantar_servidor_falso():
+    """Levanta un servidor HTTP falso en el puerto 10000 para Render"""
     try:
         server = HTTPServer(('0.0.0.0', 10000), RenderHealthCheckHandler)
         server.serve_forever()
     except Exception as e:
-        print(f"[RENDER] No se pudo levantar el servidor falso: {e}")
+        print(f"⚠️ [RENDER] No se pudo levantar el servidor falso: {e}")
 
 def blindar_agente_en_render():
+    """Lanza el servidor falso en un hilo separado"""
     hilo = threading.Thread(target=levantar_servidor_falso, daemon=True)
     hilo.start()
-    print("[OK] Servidor falso en puerto 10000 activado")
+    print("✅ [RENDER] Servidor falso en puerto 10000 activado")
 
 # ============================================================
-# CONFIGURACION DE CORREOS
+# CONFIGURACIÓN DE CORREOS
 # ============================================================
 
 EMAIL_CONTACTO = os.getenv('EMAIL_USER_CONTACTO') or os.getenv('EMAIL_USER')
@@ -63,12 +67,14 @@ SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # ============================================================
-# DIAGNOSTICO
+# DEPURACIÓN
 # ============================================================
-print("\n[DIAGNOSTICO DE CREDENCIALES]")
-print(f"[CORREO] CONTACTO: {EMAIL_CONTACTO}")
-print(f"[CORREO] VENTAS: {EMAIL_VENTAS}")
-print(f"[GEMINI] API_KEY: {'CONFIGURADA' if GEMINI_API_KEY else 'VACIA'}")
+print("\n🔍 DIAGNÓSTICO DE CREDENCIALES:")
+print(f"📧 EMAIL_CONTACTO: {EMAIL_CONTACTO}")
+print(f"🔑 PASS_CONTACTO: {'✅ CONFIGURADA' if PASS_CONTACTO else '❌ VACÍA'}")
+print(f"📧 EMAIL_VENTAS: {EMAIL_VENTAS}")
+print(f"🔑 PASS_VENTAS: {'✅ CONFIGURADA' if PASS_VENTAS else '❌ VACÍA'}")
+print(f"🤖 GEMINI_API_KEY: {'✅ CONFIGURADA' if GEMINI_API_KEY else '❌ VACÍA'}")
 print("=" * 60)
 
 # ============================================================
@@ -76,27 +82,27 @@ print("=" * 60)
 # ============================================================
 
 PROMPT_ORION = """
-Eres Orion, especialista en soporte tecnico de SATEC Network.
+Eres Orion, especialista en soporte técnico de SATEC Network.
 Atiendes el correo contacto@satecnetwork.com.
 
 Tu personalidad:
-- Tecnico, resolutivo y paciente
+- Técnico, resolutivo y paciente
 - Te enfocas en solucionar problemas
 - Das instrucciones claras y paso a paso
 
 SATEC ofrece soporte para:
-1. GPS: Rastreo satelital, geocercas, corte de motor, localizacion de flotas.
-2. CCTV: Camaras de videovigilancia, grabacion, monitoreo perimetral, IA.
-3. Control de Acceso: Biometria, huella digital, QR, tarjetas, lectores.
+1. GPS: Rastreo satelital, geocercas, corte de motor, localización de flotas.
+2. CCTV: Cámaras de videovigilancia, grabación, monitoreo perimetral, IA.
+3. Control de Acceso: Biometría, huella digital, QR, tarjetas, lectores.
 4. Chip Taxi: App para taxis, viajes, conductores.
 
-Responde de forma clara y tecnica, pero amable.
-Si es una cotizacion, deriva a ventas@satecnetwork.com.
-Telefono: 938 120 6643.
+Responde de forma clara y técnica, pero amable.
+Si es una cotización, deriva a ventas@satecnetwork.com.
+Teléfono: 938 120 6643.
 """
 
 PROMPT_LUCIA = """
-Eres Lucia, asesora comercial de SATEC Network.
+Eres Lucía, asesora comercial de SATEC Network.
 Atiendes el correo ventas@satecnetwork.com.
 
 Tu personalidad:
@@ -105,14 +111,14 @@ Tu personalidad:
 - Proactiva y persuasiva
 
 SATEC ofrece:
-1. GPS: Desde $500/mes por vehiculo
-2. CCTV: Paquetes desde $3,000 (4 camaras + DVR)
+1. GPS: Desde $500/mes por vehículo
+2. CCTV: Paquetes desde $3,000 (4 cámaras + DVR)
 3. Control de Acceso: Desde $2,500 por punto de acceso
 4. Chip Taxi: Plan desde $300/mes por unidad
 
 Siempre ofrece soluciones y menciona promociones.
-Si es un problema tecnico, deriva a soporte@satecnetwork.com.
-Telefono: 938 120 6643.
+Si es un problema técnico, deriva a soporte@satecnetwork.com.
+Teléfono: 938 120 6643.
 """
 
 # ============================================================
@@ -129,7 +135,7 @@ def test_imap(email, password):
         mail.logout()
         return True
     except Exception as e:
-        logger.error(f"[IMAP] Error para {email}: {e}")
+        logger.error(f"❌ IMAP Error para {email}: {e}")
         return False
 
 def test_smtp(email, password):
@@ -140,13 +146,13 @@ def test_smtp(email, password):
         server.quit()
         return True
     except Exception as e:
-        logger.error(f"[SMTP] Error para {email}: {e}")
+        logger.error(f"❌ SMTP Error para {email}: {e}")
         return False
 
 def responder_con_gemini(prompt_sistema, mensaje):
     if not GEMINI_API_KEY:
-        logger.error("[GEMINI] API_KEY no configurada")
-        return "Lo siento, el servicio de IA no esta disponible. Contacta al 938 120 6643."
+        logger.error("❌ GEMINI_API_KEY no configurada")
+        return "Lo siento, el servicio de IA no está disponible. Contacta al 938 120 6643."
     
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
@@ -165,8 +171,8 @@ def responder_con_gemini(prompt_sistema, mensaje):
         respuesta_texto = response_json['candidates'][0]['content']['parts'][0]['text']
         return respuesta_texto
     except Exception as e:
-        logger.error(f"[GEMINI] Error: {e}")
-        return "Lo siento, estoy teniendo problemas tecnicos. Contacta al 938 120 6643."
+        logger.error(f"❌ Error en Gemini: {e}")
+        return "Lo siento, estoy teniendo problemas técnicos. Contacta al 938 120 6643."
 
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
     try:
@@ -180,19 +186,19 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         server.login(email_from, password)
         server.send_message(msg)
         server.quit()
-        logger.info(f"[RESPUESTA] Enviada a {para} desde {email_from}")
+        logger.info(f"✅ Respuesta enviada a {para} desde {email_from}")
         return True
     except Exception as e:
-        logger.error(f"[RESPUESTA] Error desde {email_from}: {e}")
+        logger.error(f"❌ Error enviando desde {email_from}: {e}")
         return False
 
 def leer_y_responder_cuenta(cuenta_correo, password, perfil):
     if not cuenta_correo or not password:
-        logger.warning(f"[ADVERTENCIA] Credenciales incompletas para {perfil}")
+        logger.warning(f"⚠️ Credenciales incompletas para {perfil}")
         return
     
     try:
-        logger.info(f"[IMAP] {perfil} conectando...")
+        logger.info(f"📡 {perfil} conectando a IMAP...")
         context = ssl.create_default_context()
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, 993, ssl_context=context)
         mail.login(cuenta_correo, password)
@@ -202,15 +208,15 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil):
         correos_ids = data[0].split()
         
         if not correos_ids:
-            logger.info(f"[IMAP] No hay correos nuevos para {perfil}")
+            logger.info(f"📭 No hay correos nuevos para {perfil}")
             mail.close()
             mail.logout()
             return
         
-        logger.info(f"[IMAP] {len(correos_ids)} correos nuevos para {perfil}")
+        logger.info(f"📧 {len(correos_ids)} correos nuevos para {perfil}")
         
         for email_id in correos_ids:
-            logger.info(f"[PROCESANDO] Correo ID: {email_id}")
+            logger.info(f"📥 Procesando correo ID: {email_id}")
             result, msg_data = mail.fetch(email_id, '(RFC822)')
             
             msg = email.message_from_bytes(msg_data[0][1])
@@ -227,93 +233,95 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil):
             else:
                 cuerpo = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
             
-            logger.info(f"[CORREO] De: {remitente}")
-            logger.info(f"[CORREO] Asunto: {asunto}")
-            logger.info(f"[CORREO] Cuerpo: {cuerpo[:100]}...")
+            logger.info(f"📧 De: {remitente}")
+            logger.info(f"📧 Asunto: {asunto}")
+            logger.info(f"📝 Cuerpo: {cuerpo[:100]}...")
             
             if perfil == "Orion":
                 prompt = PROMPT_ORION
             else:
                 prompt = PROMPT_LUCIA
             
-            logger.info("[IA] Generando respuesta con Gemini...")
+            logger.info("🤖 Generando respuesta con Gemini...")
             respuesta = responder_con_gemini(prompt, cuerpo)
-            logger.info(f"[IA] Respuesta generada: {respuesta[:100]}...")
+            logger.info(f"💬 Respuesta generada: {respuesta[:100]}...")
             
             enviar_respuesta(remitente, asunto, respuesta, cuenta_correo, password)
             
             mail.store(email_id, '+FLAGS', '\\Seen')
-            logger.info(f"[OK] Respondido y marcado como leido")
+            logger.info(f"✅ Respondido y marcado como leído")
         
         mail.close()
         mail.logout()
         
     except Exception as e:
-        logger.error(f"[ERROR] en {perfil}: {e}")
+        logger.error(f"❌ Error en {perfil}: {e}")
 
 def procesar_todos_los_correos():
-    logger.info("[PROCESANDO] Todas las cuentas...")
+    logger.info("📬 Procesando todas las cuentas...")
     if EMAIL_CONTACTO and PASS_CONTACTO:
         leer_y_responder_cuenta(EMAIL_CONTACTO, PASS_CONTACTO, "Orion")
     if EMAIL_VENTAS and PASS_VENTAS:
-        leer_y_responder_cuenta(EMAIL_VENTAS, PASS_VENTAS, "Lucia")
-    logger.info("[PROCESANDO] Completado")
+        leer_y_responder_cuenta(EMAIL_VENTAS, PASS_VENTAS, "Lucía")
+    logger.info("📬 Procesamiento completado")
 
 # ============================================================
 # PROGRAMA PRINCIPAL
 # ============================================================
 if __name__ == '__main__':
     print("=" * 60)
-    print("CORELLA MULTI - Asistente de Correo (Gemini)")
+    print("🚀 CORELLA MULTI - Asistente de Correo (Gemini)")
     print("=" * 60)
-    print(f"[CORREO] Orion: {EMAIL_CONTACTO}")
-    print(f"[CORREO] Lucia: {EMAIL_VENTAS}")
-    print(f"[IMAP] Servidor: {IMAP_SERVER}")
-    print(f"[SMTP] Servidor: {SMTP_SERVER}")
-    print("[IA] Gemini 1.5 Flash")
+    print(f"📧 Orion 🔧: {EMAIL_CONTACTO}")
+    print(f"📧 Lucía 💬: {EMAIL_VENTAS}")
+    print(f"📡 IMAP: {IMAP_SERVER}")
+    print(f"📡 SMTP: {SMTP_SERVER}")
+    print(f"🤖 IA: Gemini 1.5 Flash")
     print("=" * 60)
     
-    # Activar escudo para Render
+    # 🔥 ACTIVAR ESCUDO PARA RENDER
     blindar_agente_en_render()
     
-    print("\n[VERIFICANDO] Conexiones...")
+    print("\n🔍 Verificando conexiones...")
     todas_ok = True
     
-    print(f"\n[TEST] Orion (contacto@satecnetwork.com)...")
+    print(f"\n📧 Probando Orion (contacto@satecnetwork.com)...")
     if EMAIL_CONTACTO and PASS_CONTACTO:
         if test_imap(EMAIL_CONTACTO, PASS_CONTACTO) and test_smtp(EMAIL_CONTACTO, PASS_CONTACTO):
-            print("[OK] Orion - Conexiones OK")
+            print("✅ Orion - Conexiones OK")
         else:
-            print("[ERROR] Orion - Fallo conexion")
+            print("❌ Orion - Falló conexión")
             todas_ok = False
     else:
-        print("[ADVERTENCIA] Orion - Sin credenciales")
+        print("⚠️ Orion - Sin credenciales")
     
-    print(f"\n[TEST] Lucia (ventas@satecnetwork.com)...")
+    print(f"\n📧 Probando Lucía (ventas@satecnetwork.com)...")
     if EMAIL_VENTAS and PASS_VENTAS:
         if test_imap(EMAIL_VENTAS, PASS_VENTAS) and test_smtp(EMAIL_VENTAS, PASS_VENTAS):
-            print("[OK] Lucia - Conexiones OK")
+            print("✅ Lucía - Conexiones OK")
         else:
-            print("[ERROR] Lucia - Fallo conexion")
+            print("❌ Lucía - Falló conexión")
             todas_ok = False
     else:
-        print("[ADVERTENCIA] Lucia - Sin credenciales")
+        print("⚠️ Lucía - Sin credenciales")
     
     if todas_ok:
-        print("\n[OK] Conexiones exitosas. Iniciando monitoreo...")
-        print("[TIMER] Revisando cada 30 segundos.\n")
+        print("\n✅ Conexiones exitosas. Iniciando monitoreo...")
+        print("⏱️  Revisando cada 30 segundos.\n")
         
+        # Ejecutar una vez al inicio
         procesar_todos_los_correos()
         
+        # Bucle infinito
         while True:
             try:
                 time.sleep(30)
                 procesar_todos_los_correos()
             except KeyboardInterrupt:
-                print("\n[DETENIDO] Corella Multi detenido")
+                print("\n🛑 Corella Multi detenido")
                 break
             except Exception as e:
-                logger.error(f"[ERROR] Inesperado: {e}")
+                logger.error(f"❌ Error inesperado: {e}")
                 time.sleep(10)
     else:
-        print("\n[ERROR] No se iniciara el monitoreo por fallas en conexiones.")
+        print("\n⚠️ No se iniciará el monitoreo por fallas en conexiones.")
