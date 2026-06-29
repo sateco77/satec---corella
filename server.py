@@ -118,32 +118,43 @@ Teléfono: 938 120 6643.
 # ============================================================
 # FUNCIONES DE PROCESAMIENTO
 # ============================================================
-
 def responder_con_gemini(prompt_sistema, mensaje):
-    """Genera respuesta usando Gemini, si falla usa contingencia inmediata"""
+    """Genera respuesta usando Gemini SDK"""
     if not GEMINI_API_KEY:
-        return "Hola, gracias por escribirnos a SATEC Network. Un asesor atenderá tu solicitud a la brevedad. Puedes marcarnos al 938 120 6643."
+        logger.error("❌ GEMINI_API_KEY no configurada")
+        return "Lo siento, el servicio de IA no está disponible. Contacta al 938 120 6643."
     
     try:
         full_prompt = f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
-        # Intentamos usar el 2.0 que ya tenías configurado originalmente
-        response = gemini_model.generate_content(full_prompt)
+        response = model.generate_content(full_prompt)
         return response.text
     except Exception as e:
-        logger.error(f"❌ Gemini fuera de servicio (Cuota/Red): {e}")
+        logger.error(f"❌ Error en Gemini: {e}")
+        # Retornamos un texto por defecto para que el flujo de correo NO se detenga aunque falle la IA
+        return "Hola, gracias por escribirnos. Recibimos tu solicitud sobre sistemas de seguridad y un asesor humano te atenderá a la brevedad. Puedes marcarnos al 938 120 6643."
+
+def enviar_respuesta(para, asunto, respuesta, email_from, password):
+    try:
+        msg = MIMEText(respuesta, 'plain', 'utf-8')
+        msg['Subject'] = f"Re: {asunto}"
+        msg['From'] = email_from
+        msg['To'] = para
         
-        # CONTINGENCIA INTELIGENTE: Si el cliente pregunta por cámaras, respondemos algo coherente de inmediato
-        msg_creado = "Hola, gracias por escribirnos a SATEC Network.\n\n"
-        mensaje_lc = mensaje.lower()
-        if "camara" in mensaje_lc or "cctv" in mensaje_lc or "video" in mensaje_lc:
-            msg_creado += "Recibimos tu solicitud sobre sistemas de CCTV / Cámaras de videovigilancia. Un asesor técnico se pondrá en contacto contigo para revisar los detalles.\n"
-        elif "gps" in mensaje_lc or "rastreo" in mensaje_lc:
-            msg_creado += "Recibimos tu solicitud sobre sistemas de localización y GPS. Un asesor técnico se comunicará a la brevedad.\n"
-        else:
-            msg_creado += "Recibimos tu correo de soporte/ventas y un asesor humano te atenderá de inmediato.\n"
-            
-        msg_creado += "\nPara una atención urgente, puedes marcarnos o escribirnos por WhatsApp al 938 120 6643.\nSaludos cordiales."
-        return msg_creado
+        logger.info(f"Connecting to SMTP {SMTP_SERVER} on port 587...")
+        # Usamos un timeout explícito para evitar que se quede colgado si la red falla
+        server = smtplib.SMTP(SMTP_SERVER, 587, timeout=15)
+        server.ehlo() 
+        server.starttls()
+        server.ehlo()
+        server.login(email_from, password)
+        server.send_message(msg)
+        server.quit()
+        logger.info(f"✅ Respuesta enviada a {para} desde {email_from}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Error SMTP desde {email_from}: {e}")
+        return False
+
 
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
     try:
