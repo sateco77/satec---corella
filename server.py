@@ -1,4 +1,4 @@
-# server.py - VERSIÓN AJUSTADA PARA RENDER
+# server.py - CON NOMBRES DE VARIABLES DE RENDER
 import os
 import imaplib
 import smtplib
@@ -49,29 +49,37 @@ def blindar_agente_en_render():
     print("✅ Servidor falso en puerto 10000 activado")
 
 # ============================================================
-# CONFIGURACIÓN DE CORREOS
+# CONFIGURACIÓN DE CORREOS (CON NOMBRES DE RENDER)
 # ============================================================
-EMAIL_CONTACTO = os.getenv('EMAIL_USER') or os.getenv('EMAIL_USER_CONTACTO')
-PASS_CONTACTO = os.getenv('EMAIL_PASSWORD') or os.getenv('EMAIL_PASS_CONTACTO')
+EMAIL_CONTACTO = os.getenv('EMAIL_USER')          # contacto@satecnetwork.com
+PASS_CONTACTO = os.getenv('EMAIL_PASSWORD')       # 7Cont@77tec
 
-EMAIL_VENTAS = os.getenv('EMAIL_VENTAS')
-PASS_VENTAS = os.getenv('PASSWORD_VENTAS')
+EMAIL_VENTAS = os.getenv('EMAIL_VENTAS')          # ventas@satecnetwork.com
+PASS_VENTAS = os.getenv('PASSWORD_VENTAS')        # 7V3nt@s77tec
 
 IMAP_SERVER = os.getenv('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
 
 # ============================================================
-# CONFIGURAR GEMINI CON SDK (VERSIÓN AJUSTADA)
+# CONFIGURAR GEMINI
 # ============================================================
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    # Usar gemini-pro que es más estable en Render
     gemini_model = genai.GenerativeModel('gemini-pro')
-    logger.info("✅ Gemini API configurada correctamente (gemini-pro)")
+    logger.info("✅ Gemini API configurada correctamente")
 else:
     gemini_model = None
     logger.warning("⚠️ GEMINI_API_KEY no detectada")
+
+# ============================================================
+# DIAGNÓSTICO
+# ============================================================
+print("\n🔍 DIAGNÓSTICO DE CREDENCIALES:")
+print(f"📧 EMAIL_CONTACTO: {EMAIL_CONTACTO}")
+print(f"📧 EMAIL_VENTAS: {EMAIL_VENTAS}")
+print(f"🤖 GEMINI_API_KEY: {'✅ CONFIGURADA' if GEMINI_API_KEY else '❌ VACÍA'}")
+print("=" * 60)
 
 # ============================================================
 # PROMPTS DE LOS AGENTES
@@ -111,14 +119,14 @@ Teléfono: 938 120 6643.
 # ============================================================
 def responder_con_gemini(prompt_sistema, mensaje):
     if not GEMINI_API_KEY or gemini_model is None:
-        return "Lo siento, el servicio de IA no está disponible temporalmente. Contacta al 938 120 6643."
+        return "Lo siento, el servicio de IA no está disponible. Contacta al 938 120 6643."
     try:
         full_prompt = f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
         response = gemini_model.generate_content(full_prompt)
         return response.text
     except Exception as e:
         logger.error(f"❌ Error en Gemini: {e}")
-        return "Lo siento, estamos experimentando interrupciones. Por favor contáctanos al 938 120 6643."
+        return "Lo siento, estamos experimentando interrupciones. Contacta al 938 120 6643."
 
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
     try:
@@ -140,6 +148,7 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
 
 def leer_y_responder_cuenta(cuenta_correo, password, perfil, prompt_sistema):
     if not cuenta_correo or not password:
+        logger.warning(f"⚠️ {perfil} - Sin credenciales")
         return
     
     try:
@@ -152,7 +161,7 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil, prompt_sistema):
         correos_ids = data[0].split()
         
         if correos_ids:
-            logger.info(f"[{perfil}] {len(correos_ids)} correos nuevos.")
+            logger.info(f"📧 [{perfil}] {len(correos_ids)} correos nuevos.")
             
             for email_id in correos_ids:
                 result, msg_data = mail.fetch(email_id, '(RFC822)')
@@ -170,13 +179,13 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil, prompt_sistema):
                 else:
                     cuerpo = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
                 
-                logger.info(f"[{perfil}] De: {remitente} | Asunto: {asunto}")
+                logger.info(f"📥 [{perfil}] De: {remitente} | Asunto: {asunto}")
                 
                 respuesta = responder_con_gemini(prompt_sistema, cuerpo)
                 
                 if enviar_respuesta(remitente, asunto, respuesta, cuenta_correo, password):
                     mail.store(email_id, '+FLAGS', '\\Seen')
-                    logger.info(f"[{perfil}] Correo marcado como leído.")
+                    logger.info(f"📌 [{perfil}] Correo marcado como leído.")
         
         mail.close()
         mail.logout()
@@ -184,12 +193,25 @@ def leer_y_responder_cuenta(cuenta_correo, password, perfil, prompt_sistema):
     except Exception as e:
         logger.error(f"❌ Error IMAP en {perfil}: {e}")
 
+def procesar_todos_los_correos():
+    logger.info("📬 Procesando todas las cuentas...")
+    if EMAIL_CONTACTO and PASS_CONTACTO:
+        leer_y_responder_cuenta(EMAIL_CONTACTO, PASS_CONTACTO, "Orion", PROMPT_ORION)
+    else:
+        logger.warning("⚠️ Orion - Sin credenciales")
+    
+    if EMAIL_VENTAS and PASS_VENTAS:
+        leer_y_responder_cuenta(EMAIL_VENTAS, PASS_VENTAS, "Lucia", PROMPT_LUCIA)
+    else:
+        logger.warning("⚠️ Lucia - Sin credenciales")
+    logger.info("📬 Procesamiento completado")
+
 # ============================================================
 # PROGRAMA PRINCIPAL
 # ============================================================
 if __name__ == '__main__':
     print("=" * 60)
-    print("CORELLA WORKER - Asistente de Correo")
+    print("🚀 CORELLA WORKER - Asistente de Correo")
     print("=" * 60)
     print(f"Orion (Soporte): {EMAIL_CONTACTO}")
     print(f"Lucia (Ventas): {EMAIL_VENTAS}")
@@ -197,15 +219,25 @@ if __name__ == '__main__':
     
     blindar_agente_en_render()
     
+    print("\n🔍 Verificando conexiones...")
+    
+    # Probar Orion
+    if EMAIL_CONTACTO and PASS_CONTACTO:
+        print(f"✅ Orion - Credenciales cargadas")
+    else:
+        print(f"⚠️ Orion - Sin credenciales")
+    
+    # Probar Lucia
+    if EMAIL_VENTAS and PASS_VENTAS:
+        print(f"✅ Lucia - Credenciales cargadas")
+    else:
+        print(f"⚠️ Lucia - Sin credenciales")
+    
+    print("\n🔄 Iniciando monitoreo...")
+    
     while True:
         try:
-            if EMAIL_CONTACTO and PASS_CONTACTO:
-                leer_y_responder_cuenta(EMAIL_CONTACTO, PASS_CONTACTO, "Orion", PROMPT_ORION)
-            
-            if EMAIL_VENTAS and PASS_VENTAS:
-                leer_y_responder_cuenta(EMAIL_VENTAS, PASS_VENTAS, "Lucia", PROMPT_LUCIA)
-                
+            procesar_todos_los_correos()
         except Exception as e:
             logger.error(f"Error en ciclo principal: {e}")
-            
         time.sleep(30)
