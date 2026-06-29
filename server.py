@@ -59,7 +59,7 @@ PASS_VENTAS = os.getenv('PASSWORD_VENTAS')
 
 IMAP_SERVER = os.getenv('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
-SMTP_PORT = int(os.getenv('SMTP_PORT', 25))
+SMTP_PORT = int(os.getenv('SMTP_PORT', 2525))
 
 # ============================================================
 # CONFIGURAR GEMINI
@@ -152,22 +152,19 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         msg['From'] = email_from
         msg['To'] = para
         
-        # Puerto 587 con STARTTLS (El único que Render permite hacia afuera)
-        logger.info(f"Connecting to SMTP {SMTP_SERVER} on port 587 (TLS)...")
-        
-        server = smtplib.SMTP(SMTP_SERVER, 587, timeout=20)
-        server.ehlo()
-        server.starttls() # Encripta la conexión de forma segura
-        server.ehlo()
+        # Usar SSL directo en puerto 465 (más confiable en Render)
+        logger.info(f"📤 Conectando a SMTP {SMTP_SERVER}:465 (SSL)...")
+        server = smtplib.SMTP_SSL(SMTP_SERVER, 2525, timeout=30)
         server.login(email_from, password)
         server.send_message(msg)
         server.quit()
         
-        logger.info(f"✅ Respuesta enviada con éxito a {para} desde {email_from}")
+        logger.info(f"✅ Correo enviado a {para}")
         return True
     except Exception as e:
         logger.error(f"❌ Error SMTP desde {email_from}: {e}")
         return False
+
 
 def leer_y_responder_cuenta(cuenta_correo, password, perfil, prompt_sistema):
     if not cuenta_correo or not password:
