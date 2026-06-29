@@ -67,7 +67,7 @@ SMTP_PORT = int(os.getenv('SMTP_PORT', 25))
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('models/gemini-1.5-flash')
+    gemini_model = genai.GenerativeModel('models/gemini-2.0-flash')
     logger.info("✅ Gemini API configurada correctamente")
 else:
     gemini_model = None
@@ -118,21 +118,33 @@ Teléfono: 938 120 6643.
 # ============================================================
 # FUNCIONES DE PROCESAMIENTO
 # ============================================================
+
 def responder_con_gemini(prompt_sistema, mensaje):
-    """Genera respuesta usando Gemini SDK"""
+    """Genera respuesta usando Gemini, si falla usa contingencia inmediata"""
     if not GEMINI_API_KEY:
-        logger.error("❌ GEMINI_API_KEY no configurada")
-        return "Lo siento, el servicio de IA no está disponible. Contacta al 938 120 6643."
+        return "Hola, gracias por escribirnos a SATEC Network. Un asesor atenderá tu solicitud a la brevedad. Puedes marcarnos al 938 120 6643."
     
     try:
         full_prompt = f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
-        # USAMOS EL NOMBRE CORRECTO: gemini_model
+        # Intentamos usar el 2.0 que ya tenías configurado originalmente
         response = gemini_model.generate_content(full_prompt)
         return response.text
     except Exception as e:
-        logger.error(f"❌ Error en Gemini: {e}")
-        return "Hola, gracias por escribirnos. Recibimos tu solicitud sobre sistemas de seguridad y un asesor humano te atenderá a la brevedad. Puedes marcarnos al 938 120 6643."
+        logger.error(f"❌ Gemini fuera de servicio (Cuota/Red): {e}")
         
+        # CONTINGENCIA INTELIGENTE: Si el cliente pregunta por cámaras, respondemos algo coherente de inmediato
+        msg_creado = "Hola, gracias por escribirnos a SATEC Network.\n\n"
+        mensaje_lc = mensaje.lower()
+        if "camara" in mensaje_lc or "cctv" in mensaje_lc or "video" in mensaje_lc:
+            msg_creado += "Recibimos tu solicitud sobre sistemas de CCTV / Cámaras de videovigilancia. Un asesor técnico se pondrá en contacto contigo para revisar los detalles.\n"
+        elif "gps" in mensaje_lc or "rastreo" in mensaje_lc:
+            msg_creado += "Recibimos tu solicitud sobre sistemas de localización y GPS. Un asesor técnico se comunicará a la brevedad.\n"
+        else:
+            msg_creado += "Recibimos tu correo de soporte/ventas y un asesor humano te atenderá de inmediato.\n"
+            
+        msg_creado += "\nPara una atención urgente, puedes marcarnos o escribirnos por WhatsApp al 938 120 6643.\nSaludos cordiales."
+        return msg_creado
+
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
     try:
         msg = MIMEText(respuesta, 'plain', 'utf-8')
@@ -140,17 +152,18 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         msg['From'] = email_from
         msg['To'] = para
         
-        # Forzamos los parámetros correctos para Hostinger (Puerto 465 con SSL)
-        puerto_seguro = 465
-        logger.info(f"Connecting to SMTP {SMTP_SERVER} on port {puerto_seguro} (SSL)...")
+        # Puerto 587 con STARTTLS (El único que Render permite hacia afuera)
+        logger.info(f"Connecting to SMTP {SMTP_SERVER} on port 587 (TLS)...")
         
-        # Cambiamos a la conexión directa por SSL que no se cuelga
-        server = smtplib.SMTP_SSL(SMTP_SERVER, puerto_seguro, timeout=15)
+        server = smtplib.SMTP(SMTP_SERVER, 587, timeout=20)
+        server.ehlo()
+        server.starttls() # Encripta la conexión de forma segura
+        server.ehlo()
         server.login(email_from, password)
         server.send_message(msg)
         server.quit()
         
-        logger.info(f"✅ Respuesta enviada exitosamente a {para} desde {email_from}")
+        logger.info(f"✅ Respuesta enviada con éxito a {para} desde {email_from}")
         return True
     except Exception as e:
         logger.error(f"❌ Error SMTP desde {email_from}: {e}")
