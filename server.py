@@ -67,7 +67,7 @@ SMTP_PORT = int(os.getenv('SMTP_PORT', 25))
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('models/gemini-2.0-flash')
+    gemini_model = genai.GenerativeModel('models/gemini-1.5-flash')
     logger.info("✅ Gemini API configurada correctamente")
 else:
     gemini_model = None
@@ -249,4 +249,4 @@ if __name__ == '__main__':
             procesar_todos_los_correos()
         except Exception as e:
             logger.error(f"Error en ciclo principal: {e}")
-        time.sleep(30)
+        time.sleep(180)
