@@ -59,7 +59,7 @@ PASS_VENTAS = os.getenv('PASSWORD_VENTAS')
 
 IMAP_SERVER = os.getenv('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
-SMTP_PORT = int(os.getenv('SMTP_PORT', 2525))
+SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
 
 # ============================================================
 # CONFIGURAR GEMINI
@@ -142,7 +142,7 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         msg['To'] = para
         
         # En Render forzamos el puerto 587 que es el canal seguro TLS autorizado
-        puerto_tls = 587
+        puerto_tls = 465
         logger.info(f"📤 Conectando a SMTP {SMTP_SERVER} en el puerto {puerto_tls} (TLS)...")
         
         # Conexión SMTP estándar + STARTTLS
