@@ -154,7 +154,8 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         
         # Usar SSL directo en puerto 465 (más confiable en Render)
         logger.info(f"📤 Conectando a SMTP {SMTP_SERVER}:465 (SSL)...")
-        server = smtplib.SMTP_SSL(SMTP_SERVER, 2525, timeout=30)
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
+        server.starttls()
         server.login(email_from, password)
         server.send_message(msg)
         server.quit()
