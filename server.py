@@ -139,25 +139,21 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         msg['From'] = email_from
         msg['To'] = para
         
-        logger.info(f"Connecting to SMTP {SMTP_SERVER} on port {SMTP_PORT}...")
+        # Forzamos Hostinger a conectar por puerto seguro 465 (SSL)
+        # Esto suele saltarse los bloqueos de Render de forma inmediata
+        PUERTO_SEGURO = 465
+        logger.info(f"Conectando a {SMTP_SERVER} por el puerto seguro {PUERTO_SEGURO}...")
         
-        # CORRECCIÓN SMTP: Para el puerto 587 se usa smtplib.SMTP normal y luego se inicia TLS.
-        # (SMTP_SSL se usa únicamente para el puerto 465)
-        if SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=15)
-        else:
-            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15)
-            server.ehlo()
-            server.starttls()
-            
+        server = smtplib.SMTP_SSL(SMTP_SERVER, PUERTO_SEGURO, timeout=15)
         server.ehlo()
         server.login(email_from, password)
         server.send_message(msg)
         server.quit()
-        logger.info(f"✅ Respuesta enviada a {para} desde {email_from}")
+        
+        logger.info(f"✅ ¡Respuesta enviada con éxito a {para}!")
         return True
     except Exception as e:
-        logger.error(f"❌ Error SMTP desde {email_from}: {e}")
+        logger.error(f"❌ Render volvió a bloquear la conexión: {e}")
         return False
 
 def leer_y_responder_cuenta(cuenta_correo, password, perfil, prompt_sistema):
