@@ -118,15 +118,19 @@ Teléfono: 938 120 6643.
 # FUNCIONES DE PROCESAMIENTO
 # ============================================================
 def responder_con_gemini(prompt_sistema, mensaje):
-    if not GEMINI_API_KEY or gemini_model is None:
+    """Genera respuesta usando Gemini SDK"""
+    if not GEMINI_API_KEY:
+        logger.error("❌ GEMINI_API_KEY no configurada")
         return "Lo siento, el servicio de IA no está disponible. Contacta al 938 120 6643."
+    
     try:
         full_prompt = f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
-        response = gemini_model.generate_content(full_prompt)
+        response = model.generate_content(full_prompt)
         return response.text
     except Exception as e:
         logger.error(f"❌ Error en Gemini: {e}")
-        return "Lo siento, estamos experimentando interrupciones. Contacta al 938 120 6643."
+        # Retornamos un texto por defecto para que el flujo de correo NO se detenga aunque falle la IA
+        return "Hola, gracias por escribirnos. Recibimos tu solicitud sobre sistemas de seguridad y un asesor humano te atenderá a la brevedad. Puedes marcarnos al 938 120 6643."
 
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
     try:
@@ -135,12 +139,16 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         msg['From'] = email_from
         msg['To'] = para
         
-        server = smtplib.SMTP(SMTP_SERVER, 587)
+        logger.info(f"Connecting to SMTP {SMTP_SERVER} on port 587...")
+        # Usamos un timeout explícito para evitar que se quede colgado si la red falla
+        server = smtplib.SMTP(SMTP_SERVER, 587, timeout=15)
+        server.ehlo() 
         server.starttls()
+        server.ehlo()
         server.login(email_from, password)
         server.send_message(msg)
         server.quit()
-        logger.info(f"✅ Correo enviado a {para}")
+        logger.info(f"✅ Respuesta enviada a {para} desde {email_from}")
         return True
     except Exception as e:
         logger.error(f"❌ Error SMTP desde {email_from}: {e}")
