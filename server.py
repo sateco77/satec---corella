@@ -1,4 +1,3 @@
-# server.py - CON NOMBRES DE VARIABLES DE RENDER
 import os
 import imaplib
 import smtplib
@@ -59,7 +58,7 @@ PASS_VENTAS = os.getenv('PASSWORD_VENTAS')
 
 IMAP_SERVER = os.getenv('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
-SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
+SMTP_PORT = int(os.getenv('SMTP_PORT', 587)) # Ajustado por defecto a 587 para usar TLS correctamente
 
 # ============================================================
 # CONFIGURAR GEMINI
@@ -119,20 +118,19 @@ Teléfono: 938 120 6643.
 # FUNCIONES DE PROCESAMIENTO
 # ============================================================
 def responder_con_gemini(prompt_sistema, mensaje):
-    """Genera respuesta usando Gemini SDK de forma segura"""
-    if not GEMINI_API_KEY:
-        logger.error("❌ GEMINI_API_KEY no configurada")
+    """Genera respuesta usando Gemini SDK"""
+    if not GEMINI_API_KEY or gemini_model is None:
+        logger.error("❌ GEMINI_API_KEY no configurada o modelo no listo")
         return "Lo siento, el servicio de IA no está disponible. Contacta al 938 120 6643."
     
     try:
         full_prompt = f"{prompt_sistema}\n\nCliente: {mensaje}\n\nAsistente:"
-        # Corrección: Tu variable global se llama gemini_model, no model
+        # CORRECCIÓN: Ahora llamamos a 'gemini_model', no a 'model'
         response = gemini_model.generate_content(full_prompt)
         return response.text
     except Exception as e:
         logger.error(f"❌ Error en Gemini: {e}")
-        # Retornamos un texto por defecto para que el flujo de correo NO se detenga aunque falle la IA
-        return "Hola, gracias por escribirnos a SATEC Network. Recibimos tu solicitud sobre nuestros sistemas de seguridad y un asesor técnico te atenderá a la brevedad. Puedes marcarnos o escribirnos por WhatsApp al 938 120 6643."
+        return "Hola, gracias por escribirnos. Recibimos tu solicitud sobre sistemas de seguridad y un asesor humano te atenderá a la brevedad. Puedes marcarnos al 938 120 6643."
 
 def enviar_respuesta(para, asunto, respuesta, email_from, password):
     try:
@@ -141,25 +139,26 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         msg['From'] = email_from
         msg['To'] = para
         
-        # En Render forzamos el puerto 587 que es el canal seguro TLS autorizado
-        puerto_tls = 465
-        logger.info(f"📤 Conectando a SMTP {SMTP_SERVER} en el puerto {puerto_tls} (TLS)...")
+        logger.info(f"Connecting to SMTP {SMTP_SERVER} on port {SMTP_PORT}...")
         
-        # Conexión SMTP estándar + STARTTLS
-        server = smtplib.SMTP(SMTP_SERVER, puerto_tls, timeout=20)
-        server.ehlo()
-        server.starttls()  # Activa la encriptación segura requerida por Hostinger
+        # CORRECCIÓN SMTP: Para el puerto 587 se usa smtplib.SMTP normal y luego se inicia TLS.
+        # (SMTP_SSL se usa únicamente para el puerto 465)
+        if SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=15)
+        else:
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15)
+            server.ehlo()
+            server.starttls()
+            
         server.ehlo()
         server.login(email_from, password)
         server.send_message(msg)
         server.quit()
-        
-        logger.info(f"✅ Respuesta enviada con éxito a {para} desde {email_from}")
+        logger.info(f"✅ Respuesta enviada a {para} desde {email_from}")
         return True
     except Exception as e:
         logger.error(f"❌ Error SMTP desde {email_from}: {e}")
         return False
-
 
 def leer_y_responder_cuenta(cuenta_correo, password, perfil, prompt_sistema):
     if not cuenta_correo or not password:
@@ -236,13 +235,11 @@ if __name__ == '__main__':
     
     print("\n🔍 Verificando conexiones...")
     
-    # Probar Orion
     if EMAIL_CONTACTO and PASS_CONTACTO:
         print(f"✅ Orion - Credenciales cargadas")
     else:
         print(f"⚠️ Orion - Sin credenciales")
     
-    # Probar Lucia
     if EMAIL_VENTAS and PASS_VENTAS:
         print(f"✅ Lucia - Credenciales cargadas")
     else:
@@ -255,4 +252,4 @@ if __name__ == '__main__':
             procesar_todos_los_correos()
         except Exception as e:
             logger.error(f"Error en ciclo principal: {e}")
-        time.sleep(180)
+        time.sleep(30)
