@@ -59,6 +59,7 @@ PASS_VENTAS = os.getenv('PASSWORD_VENTAS')
 
 IMAP_SERVER = os.getenv('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
+SMTP_PORT = int(os.getenv('SMTP_PORT', 25))
 
 # ============================================================
 # CONFIGURAR GEMINI
@@ -141,7 +142,7 @@ def enviar_respuesta(para, asunto, respuesta, email_from, password):
         
         logger.info(f"Connecting to SMTP {SMTP_SERVER} on port 587...")
         # Usamos un timeout explícito para evitar que se quede colgado si la red falla
-        server = smtplib.SMTP(SMTP_SERVER, 587, timeout=15)
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
         server.ehlo() 
         server.starttls()
         server.ehlo()
