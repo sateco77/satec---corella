@@ -51,11 +51,11 @@ def blindar_agente_en_render():
 # ============================================================
 # CONFIGURACIÓN DE CORREOS (CON NOMBRES DE RENDER)
 # ============================================================
-EMAIL_CONTACTO = os.getenv('EMAIL_USER')          # contacto@satecnetwork.com
-PASS_CONTACTO = os.getenv('EMAIL_PASSWORD')       # 7Cont@77tec
+EMAIL_CONTACTO = os.getenv('EMAIL_CONTACTO')          
+PASS_CONTACTO = os.getenv('PASSWORD_CONTACTO')       
 
-EMAIL_VENTAS = os.getenv('EMAIL_VENTAS')          # ventas@satecnetwork.com
-PASS_VENTAS = os.getenv('PASSWORD_VENTAS')        # 7V3nt@s77tec
+EMAIL_VENTAS = os.getenv('EMAIL_VENTAS')          
+PASS_VENTAS = os.getenv('PASSWORD_VENTAS')        
 
 IMAP_SERVER = os.getenv('IMAP_SERVER', 'imap.hostinger.com')
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.hostinger.com')
